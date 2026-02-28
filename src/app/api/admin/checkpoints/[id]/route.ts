@@ -16,12 +16,29 @@ export async function PATCH(
 ) {
   try {
     const p = await params;
-    const { nfcTagId, name, location, groupId } = await req.json();
-    console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId });
+    const { nfcTagId, name, location, groupId, creatorId } = await req.json();
+    console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId, creatorId });
+
+    let targetGroupId = groupId || null;
+
+    if (creatorId) {
+      const creator = await db.user.findUnique({
+        where: { id: creatorId }
+      });
+
+      if (creator && creator.roleCode === 'ADMIN') {
+        // Admins can only update in their own group
+        const checkpoint = await db.checkpoint.findUnique({
+          where: { id: p.id }
+        });
+        // Keep the existing group ID for admins
+        targetGroupId = checkpoint?.groupId || creator.groupId;
+      }
+    }
 
     const checkpoint = await db.checkpoint.update({
       where: { id: p.id },
-      data: { nfcTagId, name, location, groupId: groupId || null },
+      data: { nfcTagId, name, location, groupId: targetGroupId },
     });
     return NextResponse.json(checkpoint);
   } catch (error: unknown) {

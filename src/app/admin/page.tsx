@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Clock, MapPin, Calendar, Users, RefreshCw, Route } from "lucide-react";
 import MonitorTab from "@/components/admin/MonitorTab";
 import CheckpointTab from "@/components/admin/CheckpointTab";
+import RouteTab from "@/components/admin/RouteTab";
 import UserTab from "@/components/admin/UserTab";
 
 export default function AdminDashboard() {
@@ -74,20 +75,7 @@ export default function AdminDashboard() {
                 {activeTab === "config" && <CheckpointTab />}
                 {activeTab === "users" && <UserTab />}
 
-                {activeTab === "route" && (
-                    <div className="bg-white rounded-2xl p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 animate-in fade-in duration-300">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">路线配置</h2>
-                            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
-                                <Route className="w-4 h-4" /> 新建路线
-                            </button>
-                        </div>
-                        <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/30">
-                            <Route className="w-12 h-12 text-gray-300 mb-4" />
-                            <p className="text-gray-400 font-medium">巡检路线功能开发中...</p>
-                        </div>
-                    </div>
-                )}
+                {activeTab === "route" && <RouteTab />}
 
                 {activeTab === "plan" && (
                     <div className="bg-white rounded-2xl p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 animate-in fade-in duration-300">

@@ -41,6 +41,7 @@ model UserGroup {
   description String?
   users       User[]
   checkpoints Checkpoint[]
+  routes      Route[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -73,6 +74,8 @@ model Route {
   plans       Plan[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  groupId     String?
+  group       UserGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
 }
 
 model RouteCheckpoint {

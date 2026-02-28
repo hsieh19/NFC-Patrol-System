@@ -32,6 +32,7 @@ export default function CheckpointTab() {
     const [editData, setEditData] = useState({ name: "", nfcTagId: "", location: "", groupId: "" });
     const [groups, setGroups] = useState<Group[]>([]);
     const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
+    const [groupFilter, setGroupFilter] = useState("");
 
 
     const fetchCheckpoints = async () => {
@@ -103,7 +104,7 @@ export default function CheckpointTab() {
             const res = await fetch(`/api/admin/checkpoints/${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(editData),
+                body: JSON.stringify({ ...editData, creatorId: currentUser?.id }),
             });
             if (res.ok) {
                 setEditingId(null);
@@ -129,10 +130,31 @@ export default function CheckpointTab() {
 
     if (loading) return <div className="py-20 text-center">加载中...</div>;
 
+    // Filter checkpoints by group name
+    const filteredCheckpoints = checkpoints.filter(cp => {
+        if (!groupFilter) return true;
+        const groupName = cp.group?.name || '系统全局';
+        return groupName.toLowerCase().includes(groupFilter.toLowerCase());
+    });
+
     return (
         <div className="bg-white rounded-2xl p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 animate-in fade-in duration-300">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">巡检点配置</h2>
+            <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div className="flex items-center gap-4">
+                    <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">巡检点配置</h2>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="筛选分组..."
+                            value={groupFilter}
+                            onChange={(e) => setGroupFilter(e.target.value)}
+                            className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
                 <button
                     onClick={() => setIsAdding(true)}
                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
@@ -206,7 +228,7 @@ export default function CheckpointTab() {
                                 </td>
                             </tr>
                         )}
-                        {checkpoints.map((cp) => (
+                        {filteredCheckpoints.map((cp) => (
                             editingId === cp.id ? (
                                 <tr key={cp.id} className="bg-blue-50/20 transition-colors">
                                     <td className="py-3 px-4">

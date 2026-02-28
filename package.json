@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/start.js",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "npx prisma migrate dev",
+    "db:generate": "npx prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

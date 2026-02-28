@@ -19,43 +19,59 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 2. Seed system roles first (ignore if already exist)
-    try {
-      await db.role.createMany({
-        data: [
-          {
-            code: 'SUPER_ADMIN',
-            name: '超级管理员',
-            description: '拥有所有权限的系统最高管理角色',
-            isSystem: true,
-            permissions: JSON.stringify(['ALL'])
-          },
-          {
-            code: 'ADMIN',
-            name: '管理员',
-            description: '管理人员及巡检配置，但不具备系统级配置权限',
-            isSystem: true,
-            permissions: JSON.stringify(['ADMIN_DASHBOARD', 'ADMIN_USER_MANAGE', 'ADMIN_CHECKPOINT', 'ADMIN_SCHEDULE', 'ADMIN_MONITOR', 'APP_SCAN', 'APP_REPAIR'])
-          },
-          {
-            code: 'OPERATOR',
-            name: '运维人员',
-            description: '负责设备维护与巡检执行',
-            isSystem: true,
-            permissions: JSON.stringify(['APP_SCAN', 'APP_REPAIR', 'ADMIN_MONITOR'])
-          },
-          {
-            code: 'SECURITY',
-            name: '保安人员',
-            description: '负责常规巡逻打卡',
-            isSystem: true,
-            permissions: JSON.stringify(['APP_SCAN'])
-          }
-        ],
-        skipDuplicates: true,
-      });
-    } catch {
+    // 2. Seed system roles first (ensure they exist)
+    const roles = [
+      {
+        code: 'SUPER_ADMIN',
+        name: '超级管理员',
+        description: '拥有所有权限的系统最高管理角色',
+        isSystem: true,
+        permissions: JSON.stringify(['ALL'])
+      },
+      {
+        code: 'ADMIN',
+        name: '管理员',
+        description: '管理人员及巡检配置，但不具备系统级配置权限',
+        isSystem: true,
+        permissions: JSON.stringify(['ADMIN_DASHBOARD', 'ADMIN_USER_MANAGE', 'ADMIN_CHECKPOINT', 'ADMIN_SCHEDULE', 'ADMIN_MONITOR', 'APP_SCAN', 'APP_REPAIR'])
+      },
+      {
+        code: 'OPERATOR',
+        name: '运维人员',
+        description: '负责设备维护与巡检执行',
+        isSystem: true,
+        permissions: JSON.stringify(['APP_SCAN', 'APP_REPAIR', 'ADMIN_MONITOR'])
+      },
+      {
+        code: 'SECURITY',
+        name: '保安人员',
+        description: '负责常规巡逻打卡',
+        isSystem: true,
+        permissions: JSON.stringify(['APP_SCAN'])
+      }
+    ];
+
+    // Create roles one by one to ensure they exist
+    for (const role of roles) {
+      try {
+        const createdRole = await db.role.upsert({
+          where: { code: role.code },
+          update: role,
+          create: role
+        });
+        console.log(`Created/updated role: ${createdRole.code}`);
+      } catch (error) {
+        console.error(`Error creating role ${role.code}:`, error);
+      }
     }
+
+    // Verify roles exist
+    const existingRoles = await db.role.findMany();
+    console.log('Existing roles:', existingRoles.map(r => r.code));
+
+    // Check if SUPER_ADMIN role exists
+    const superAdminRole = await db.role.findUnique({ where: { code: 'SUPER_ADMIN' } });
+    console.log('SUPER_ADMIN role exists:', !!superAdminRole);
 
     // 3. Transcations: Create admin and Mark as initialised
     await db.$transaction([
@@ -65,14 +81,14 @@ export async function POST(req: NextRequest) {
           password: hashedPassword,
           name: '系统超级管理员',
           roleCode: 'SUPER_ADMIN',
-          department: '技术中心',
-        },
+          department: '技术中心'
+        }
       }),
       db.systemConfig.upsert({
         where: { id: 1 },
         update: { isInitialised: true },
-        create: { id: 1, isInitialised: true },
-      }),
+        create: { id: 1, isInitialised: true }
+      })
     ]);
 
     return NextResponse.json({ success: true, message: 'System initialised successfully' });
