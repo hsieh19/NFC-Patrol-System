@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  code        String   @id // 'ADMIN', 'OPERATOR', or custom id
+  name        String
+  permissions String   @default("[]") // JSON array of permission strings
+  description String?
+  isSystem    Boolean  @default(false)
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String?  @unique // For local user/admin login
+  password     String?  // Hashed password
+  name         String
+  avatar       String?
+  department   String?  
+  roleCode     String   @default("OPERATOR")
+  role         Role?    @relation(fields: [roleCode], references: [code], onDelete: SetDefault)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  groupId      String?
+  group        UserGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  patrols      PatrolRecord[]
+  repairs      RepairReport[]
+}
+
+model UserGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  users       User[]
+  checkpoints Checkpoint[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SystemConfig {
+  id        Int      @id @default(1)
+  isInitialised Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model Checkpoint {
+  id        String   @id @default(cuid())
+  nfcTagId  String   @unique
+  name      String
+  location  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  records   PatrolRecord[]
+  repairs   RepairReport[]
+  routeLinks RouteCheckpoint[]
+  groupId   String?
+  group     UserGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+}
+
+model Route {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  checkpoints RouteCheckpoint[]
+  plans       Plan[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RouteCheckpoint {
+  id           String     @id @default(cuid())
+  routeId      String
+  route        Route      @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  checkpointId String
+  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  order        Int        @default(0)
+  
+  @@unique([routeId, checkpointId])
+}
+
+model Plan {
+  id           String      @id @default(cuid())
+  name         String?     // 计划名称
+  routeId      String
+  route        Route       @relation(fields: [routeId], references: [id])
+  startTime    String      
+  endTime      String      
+  assignedTo   String?     // 可指定具体用户ID或角色编码
+  frequency    String      @default("DAILY") 
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model PatrolRecord {
+  id                 String      @id @default(cuid())
+  checkpointId       String?
+  checkpoint         Checkpoint? @relation(fields: [checkpointId], references: [id], onDelete: SetNull)
+  checkpointName     String?     // 冗余字段：保存发生时的巡检点名称
+  checkpointLocation String?     // 冗余字段：保存发生时的物理位置
+  userId             String
+  user               User        @relation(fields: [userId], references: [id])
+  status             String      @default("NORMAL")
+  notes              String?     
+  offlineId          String?     @unique 
+  createdAt          DateTime    @default(now())
+}
+
+model RepairReport {
+  id           String      @id @default(cuid())
+  checkpointId String?
+  checkpoint   Checkpoint? @relation(fields: [checkpointId], references: [id])
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  description  String      
+  imageUrls    String?     
+  status       String      @default("PENDING") 
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
