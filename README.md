@@ -1,4 +1,4 @@
-# 数字化巡更指挥系统 (Xungeng)
+# 巡更打点系统
 
 基于“手机 + 飞书 + NFC标签”打造的低成本、高效率数字化巡更解决方案。采用轻量化架构，支持离线打卡与智能设备区分，全面实现实时监控、异常处置与全量审计。
 
@@ -15,7 +15,42 @@
 
 ---
 
-## 🛠 技术栈
+## � 项目结构
+
+```text
+src/
+├── app/                  # Next.js App Router 路由
+│   ├── admin/            # 管理后台页面 (PC端)
+│   ├── mobile/           # 巡更打卡页面 (手机端)
+│   ├── api/              # 后端 API 接口
+│   │   ├── admin/        # 管理端接口 (用户、点位、计划、记录管理)
+│   │   ├── auth/         # 认证接口 (登录、初始化)
+│   │   ├── patrol/       # 巡更业务接口
+│   │   └── repair/       # 报修业务接口
+│   ├── login/            # 登录页面
+│   ├── init/             # 系统初始化页面
+│   ├── globals.css       # 全局样式
+│   └── layout.tsx        # 根布局
+├── components/           # 可复用组件
+│   ├── admin/            # 管理后台专用组件 (监控、用户、计划等)
+│   ├── mobile/           # 移动端专用组件 (NFC感应、打卡列表)
+│   └── ui/               # 基于 shadcn/ui 的基础 UI 组件
+├── hooks/                # 自定义 React Hooks (如 use-sync 同步逻辑)
+├── lib/                  # 工具函数与核心库
+│   ├── db.ts             # Prisma 数据库客户端 (服务端)
+│   ├── offline-db.ts     # Dexie.js 本地数据库 (客户端)
+│   ├── permissions.ts    # 权限控制逻辑
+│   └── utils.ts          # 通用工具函数
+└── middleware.ts         # 路由拦截与设备分流中间件
+
+prisma/                   # 数据库模式定义
+├── schema.prisma         # Prisma Schema
+└── dev.db                # SQLite 本地数据库 (开发环境)
+```
+
+---
+
+## �🛠 技术栈
 
 本项目是基于现代前端工程化最佳实践构建的全栈（Full-Stack）系统：
 
