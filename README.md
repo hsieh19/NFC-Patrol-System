@@ -1,6 +1,6 @@
 # 巡更打点系统 (NFC Patrol System)
 
-基于 **Next.js 15 (App Router)** + **Feishu (飞书) 生态** 打造的新一代数字化巡更解决方案。通过“手机 + NFC 标签”实现低成本、高效率的点位管理、实时监控、离线补录与异常处置。
+基于 **Next.js 15 (App Router)** 打造的新一代全栈数字化巡更解决方案。通过“手机 + NFC 标签”实现低成本、高效率的点位管理、实时监控、离线补录与异常处置。
 
 ---
 
@@ -10,7 +10,7 @@
 - **设备识别映射**：通过 Middleware 识别 User-Agent。
     - **移动端 (Mobile)**：自动进入巡更作业面，优化单手操作体验。
     - **管理端 (Admin)**：自动进入桌面版管理后台，提供大屏监控与配置面板。
-- **统一身份认证**：集成基于 Cookie 的权限验证，支持飞书扫码与账号密码登录。
+- **统一身份认证**：集成基于 Cookie 的权限验证，支持多角色安全登录。
 
 ### 2. 移动端作业系统 (Mobile Terminal)
 - **NFC 极速打卡**：基于高性能感应逻辑（支持物理感应与模拟调试），打卡时伴随物理震动与音效反馈。
@@ -49,21 +49,20 @@ src/
 │   ├── db.ts             # Prisma ORM (连接 PostgreSQL/SQLite)
 │   ├── offline-db.ts     # Dexie.js 离线存储封装
 │   ├── permissions.ts    # 角色权限校验函数
-│   └── utils.ts          # 样式合并、格式化等通法
+│   └── utils.ts          # 样式合并、格式化等通用工具
 └── prisma/               # 数据库建模定义
 ```
 
 ---
 
-## 🛠 技术深度栈
+## 🛠 技术栈
 
 - **前端架构**: `Next.js 15` + `React 19` + `TypeScript`
 - **样式系统**: `Tailwind CSS` + `Framer Motion` (动效) + `Shadcn/UI`
 - **数据持久化**: 
     - **离线**: `Dexie.js` (IndexedDB Wrapper)
     - **在线**: `Prisma` + `SQLite/PostgreSQL`
-- **实时通信**: API Polling / (规划中) Webhooks
-- **移动交互**: Web NFC API + Vibration API + Web Audio API
+- **交互接口**: Web NFC API + Vibration API + Web Audio API
 
 ---
 
@@ -71,7 +70,6 @@ src/
 
 ### 1. 环境准备
 - Node.js 18+ 
-- 已登录 GitHub CLI (`gh auth login`)
 
 ### 2. 安装与启动
 ```bash
@@ -88,8 +86,3 @@ npm run dev
 ### 3. 使用说明
 - **模拟移动端**：在浏览器开发者工具（F12）中开启“手机模式”并刷新网页，即可进入巡更界面。
 - **管理后台**：使用桌面浏览器直接访问即可进入管理看板。
-
----
-
-## 📜 理念原则
-秉承 **KISS (Keep It Simple, Stupid)** 设计理念，坚持前端无占位符 (No Placeholders)、交互全反馈。致力于用最轻量的代码实现工业级可靠的数字化工具。
