@@ -9,13 +9,14 @@ import CheckpointTab from "@/components/admin/CheckpointTab";
 import RouteTab from "@/components/admin/RouteTab";
 import PlanTab from "@/components/admin/PlanTab";
 import UserTab from "@/components/admin/UserTab";
+import AssessmentTab from "@/components/admin/AssessmentTab";
 
 export default function AdminDashboard() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState("monitor");
     const [currentTime, setCurrentTime] = useState<string>("");
     const [currentUser, setCurrentUser] = useState<{ id: string, username?: string, name: string, roleCode: string } | null>(null);
-    const [roles, setRoles] = useState<any[]>([]);
+    const [roles, setRoles] = useState<{ code: string, name: string }[]>([]);
     const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
     const [passwordForm, setPasswordForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
@@ -294,22 +295,7 @@ export default function AdminDashboard() {
                     {activeTab === "route" && <RouteTab />}
                     {activeTab === "plan" && <PlanTab />}
 
-                    {activeTab === "assessment" && (
-                        <div className="bg-white rounded-2xl p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 animate-in fade-in duration-300">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">计划考核</h2>
-                                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
-                                    <Calendar className="w-4 h-4" /> 新建考核
-                                </button>
-                            </div>
-                            <div className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-                                    <Calendar className="w-8 h-8 text-gray-300" />
-                                </div>
-                                <p className="text-gray-500 font-medium">计划考核功能开发中...</p>
-                            </div>
-                        </div>
-                    )}
+                    {activeTab === "assessment" && <AssessmentTab />}
                 </div>
             </div>
         </div>

@@ -491,17 +491,17 @@ export default function UserTab() {
                                     type="text"
                                     value={groupForm.name}
                                     onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors"
-                                    placeholder="如：安保一部"
+                                    className="w-full border border-blue-200 rounded-lg px-4 py-3 outline-none focus:border-blue-500 transition-all font-medium"
+                                    placeholder="如：CD1"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">分组描述</label>
+                                <label className="block text-sm font-bold text-gray-600 mb-2">分组描述</label>
                                 <textarea
                                     value={groupForm.description}
                                     onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors h-24"
-                                    placeholder="选填"
+                                    className="w-full border border-blue-50 rounded-lg px-4 py-3 outline-none focus:border-blue-500 transition-all h-24 resize-none font-medium"
+                                    placeholder="如：成都1号"
                                 />
                             </div>
                         </div>
