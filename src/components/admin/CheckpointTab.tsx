@@ -96,6 +96,10 @@ export default function CheckpointTab() {
             const parsed = JSON.parse(userData);
             setCurrentUser(parsed);
         }
+
+        // 每30秒自动刷新一次数据，确保电脑端和手机端同步
+        const timer = setInterval(fetchCheckpoints, 30000);
+        return () => clearInterval(timer);
     }, []);
 
     const handleAdd = async () => {

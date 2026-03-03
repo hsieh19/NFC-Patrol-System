@@ -3,8 +3,8 @@ import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "内网巡更系统 - 移动端",
-  description: "纯本地内网巡更打卡与异常提报系统",
+  title: "运维南区巡更系统-移动端",
+  description: "巡更系统移动端",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
 };
 
