@@ -39,6 +39,7 @@ export default function LoginPage() {
                 // 存储用户信息供前端调用
                 localStorage.setItem("user", JSON.stringify({
                     id: data.user.id,
+                    username: data.user.username,
                     name: data.user.name,
                     role: data.user.role
                 }));
