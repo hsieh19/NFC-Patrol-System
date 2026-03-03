@@ -16,10 +16,10 @@ export async function PATCH(
 ) {
   try {
     const p = await params;
-    const { nfcTagId, name, location, groupId, creatorId } = await req.json();
-    console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId, creatorId });
+    const { nfcTagId, name, location, groupId, roleCode, creatorId } = await req.json();
+    console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId, roleCode, creatorId });
 
-    let targetGroupId = groupId || null;
+    let targetGroupId = groupId;
 
     if (creatorId) {
       const creator = await db.user.findUnique({
@@ -32,13 +32,13 @@ export async function PATCH(
           where: { id: p.id }
         });
         // Keep the existing group ID for admins
-        targetGroupId = checkpoint?.groupId || creator.groupId;
+        targetGroupId = checkpoint?.groupId || creator.groupId || groupId;
       }
     }
 
     const checkpoint = await db.checkpoint.update({
       where: { id: p.id },
-      data: { nfcTagId, name, location, groupId: targetGroupId },
+      data: { nfcTagId, name, location, groupId: targetGroupId, roleCode },
     });
     return NextResponse.json(checkpoint);
   } catch (error: unknown) {

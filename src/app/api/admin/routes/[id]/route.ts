@@ -8,10 +8,10 @@ export async function PATCH(
 ) {
   try {
     const p = await params;
-    const { name, description, groupId, checkpoints } = await req.json();
+    const { name, description, groupId, roleCode, checkpoints } = await req.json();
 
-    if (!name) {
-      return NextResponse.json({ error: 'Route name is required' }, { status: 400 });
+    if (!name || !groupId || !roleCode) {
+      return NextResponse.json({ error: 'Route name, Group ID and Role Code are required' }, { status: 400 });
     }
 
     // Update route
@@ -20,7 +20,8 @@ export async function PATCH(
       data: {
         name,
         description,
-        groupId: groupId || null
+        groupId,
+        roleCode
       }
     });
 
@@ -46,6 +47,7 @@ export async function PATCH(
       where: { id: p.id },
       include: {
         group: true,
+        role: true,
         checkpoints: {
           include: {
             checkpoint: true

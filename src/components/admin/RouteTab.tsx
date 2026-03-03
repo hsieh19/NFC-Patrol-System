@@ -17,12 +17,19 @@ interface Group {
     name: string;
 }
 
+interface Role {
+    code: string;
+    name: string;
+}
+
 interface Route {
     id: string;
     name: string;
     description?: string;
-    groupId: string | null;
-    group?: { id: string, name: string } | null;
+    groupId: string;
+    group?: { id: string, name: string };
+    roleCode: string;
+    role?: { code: string, name: string };
     checkpoints: RouteCheckpoint[];
 }
 
@@ -44,16 +51,20 @@ export default function RouteTab() {
     const [routes, setRoutes] = useState<Route[]>([]);
     const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
+    const [roles, setRoles] = useState<Role[]>([]);
     const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [groupFilter, setGroupFilter] = useState("");
+    const [roleFilter, setRoleFilter] = useState("");
     
     // Form data
     const [routeForm, setRouteForm] = useState({
         name: "",
         description: "",
-        groupId: ""
+        groupId: "",
+        roleCode: ""
     });
     
     // Route checkpoints
@@ -93,6 +104,20 @@ export default function RouteTab() {
         }
     };
 
+    const fetchRoles = async () => {
+        try {
+            const res = await fetch("/api/admin/roles");
+            const data = await res.json();
+            // 只获取运维人员和保安人员角色
+            const filteredRoles = data.filter((role: Role) => 
+                role.code === "OPERATOR" || role.code === "SECURITY"
+            );
+            setRoles(filteredRoles);
+        } catch (error) {
+            console.error("Failed to fetch roles:", error);
+        }
+    };
+
     useEffect(() => {
         const userData = localStorage.getItem("user");
         if (userData) {
@@ -104,6 +129,7 @@ export default function RouteTab() {
             await fetchRoutes();
             await fetchCheckpoints();
             await fetchGroups();
+            await fetchRoles();
             setLoading(false);
         };
         
@@ -111,7 +137,7 @@ export default function RouteTab() {
     }, []);
 
     const handleAddRoute = async () => {
-        if (!routeForm.name) return;
+        if (!routeForm.name || !routeForm.groupId || !routeForm.roleCode) return;
         
         try {
             const res = await fetch("/api/admin/routes", {
@@ -140,7 +166,7 @@ export default function RouteTab() {
     };
 
     const handleEditRoute = async (id: string) => {
-        if (!routeForm.name) return;
+        if (!routeForm.name || !routeForm.groupId || !routeForm.roleCode) return;
         
         try {
             const res = await fetch(`/api/admin/routes/${id}`, {
@@ -187,7 +213,8 @@ export default function RouteTab() {
         setRouteForm({
             name: route.name,
             description: route.description || "",
-            groupId: route.groupId || ""
+            groupId: route.groupId,
+            roleCode: route.roleCode
         });
         
         // Load route checkpoints
@@ -195,14 +222,33 @@ export default function RouteTab() {
         
         // Update available checkpoints
         const usedCheckpointIds = (route.checkpoints || []).map(cp => cp.checkpointId);
-        setAvailableCheckpoints(checkpoints.filter(cp => !usedCheckpointIds.includes(cp.id)));
+        let filteredCheckpoints = checkpoints.filter(cp => !usedCheckpointIds.includes(cp.id));
+        if (route.roleCode) {
+            filteredCheckpoints = filteredCheckpoints.filter(cp => cp.roleCode === route.roleCode);
+        }
+        setAvailableCheckpoints(filteredCheckpoints);
     };
 
     const resetForm = () => {
-        setRouteForm({ name: "", description: "", groupId: "" });
+        setRouteForm({ name: "", description: "", groupId: "", roleCode: "" });
         setRouteCheckpoints([]);
         setAvailableCheckpoints(checkpoints);
     };
+
+    // Update available checkpoints when role changes
+    React.useEffect(() => {
+        if (!routeForm.roleCode) {
+            const usedCheckpointIds = routeCheckpoints.map(cp => cp.checkpointId);
+            setAvailableCheckpoints(checkpoints.filter(cp => !usedCheckpointIds.includes(cp.id)));
+        } else {
+            const usedCheckpointIds = routeCheckpoints.map(cp => cp.checkpointId);
+            const filteredCheckpoints = checkpoints.filter(cp => 
+                !usedCheckpointIds.includes(cp.id) && 
+                cp.roleCode === routeForm.roleCode
+            );
+            setAvailableCheckpoints(filteredCheckpoints);
+        }
+    }, [routeForm.roleCode, checkpoints, routeCheckpoints]);
 
     const handleAddCheckpoint = (checkpoint: Checkpoint) => {
         const newCheckpoint: RouteCheckpoint = {
@@ -242,10 +288,50 @@ export default function RouteTab() {
 
     if (loading) return <div className="py-20 text-center">加载中...</div>;
 
+    // Filter routes by group and role
+    const filteredRoutes = routes.filter(route => {
+        // Filter by group
+        const groupMatch = !groupFilter || 
+            (route.group?.name && route.group.name.toLowerCase().includes(groupFilter.toLowerCase()));
+        
+        // Filter by role (only if group is matched)
+        const roleMatch = !roleFilter || 
+            (groupMatch && 
+             (route.role?.name && route.role.name.toLowerCase().includes(roleFilter.toLowerCase())));
+        
+        return groupMatch && roleMatch;
+    });
+
     return (
         <div className="bg-white rounded-2xl p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 animate-in fade-in duration-300">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">路线配置</h2>
+            <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div className="flex items-center gap-4">
+                    <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">路线配置</h2>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="筛选分组..."
+                            value={groupFilter}
+                            onChange={(e) => setGroupFilter(e.target.value)}
+                            className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="筛选角色..."
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value)}
+                            className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
                 <button
                     onClick={() => {
                         setIsAdding(true);
@@ -265,18 +351,24 @@ export default function RouteTab() {
                         <tr className="border-b border-gray-100 italic">
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">序号</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">所属分组</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-400 px-4">所属角色</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">路线名称</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">点位统计</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4 text-right">操作</th>
                         </tr>
                     </thead>
                     <tbody className="text-sm">
-                        {routes.map((route, index) => (
+                        {filteredRoutes.map((route, index) => (
                             <tr key={route.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                                 <td className="py-4 px-4 text-gray-500">{index + 1}</td>
                                 <td className="py-4 px-4">
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${route.group ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
                                         {route.group?.name || '系统全局'}
+                                    </span>
+                                </td>
+                                <td className="py-4 px-4">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${route.role ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        {route.role?.name || route.roleCode}
                                     </span>
                                 </td>
                                 <td className="py-4 px-4 text-[#0f172a] font-semibold">{route.name}</td>
@@ -299,9 +391,9 @@ export default function RouteTab() {
                                 </td>
                             </tr>
                         ))}
-                        {routes.length === 0 && (
+                        {filteredRoutes.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="py-12 text-center text-gray-400">
+                                <td colSpan={6} className="py-12 text-center text-gray-400">
                                     暂无路线配置
                                 </td>
                             </tr>
@@ -349,22 +441,37 @@ export default function RouteTab() {
                                             onChange={(e) => setRouteForm({ ...routeForm, groupId: e.target.value })}
                                             className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
-                                            <option value="">-- 系统全局 --</option>
+                                            <option value="">-- 请选择分组 --</option>
                                             {groups.map(g => (
                                                 <option key={g.id} value={g.id}>{g.name}</option>
                                             ))}
                                         </select>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">路线描述</label>
-                                    <input
-                                        type="text"
-                                        value={routeForm.description}
-                                        onChange={(e) => setRouteForm({ ...routeForm, description: e.target.value })}
-                                        placeholder="请输入路线描述（选填）"
-                                        className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">路线描述</label>
+                                        <input
+                                            type="text"
+                                            value={routeForm.description}
+                                            onChange={(e) => setRouteForm({ ...routeForm, description: e.target.value })}
+                                            placeholder="请输入路线描述（选填）"
+                                            className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">所属角色</label>
+                                        <select
+                                            value={routeForm.roleCode}
+                                            onChange={(e) => setRouteForm({ ...routeForm, roleCode: e.target.value })}
+                                            className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value="">-- 请选择角色 --</option>
+                                            {roles.map(r => (
+                                                <option key={r.code} value={r.code}>{r.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 

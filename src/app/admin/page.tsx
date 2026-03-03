@@ -5,6 +5,7 @@ import { Clock, MapPin, Calendar, Users, RefreshCw, Route } from "lucide-react";
 import MonitorTab from "@/components/admin/MonitorTab";
 import CheckpointTab from "@/components/admin/CheckpointTab";
 import RouteTab from "@/components/admin/RouteTab";
+import PlanTab from "@/components/admin/PlanTab";
 import UserTab from "@/components/admin/UserTab";
 
 export default function AdminDashboard() {
@@ -62,6 +63,13 @@ export default function AdminDashboard() {
                         计划配置
                     </div>
                     <div
+                        onClick={() => setActiveTab("assessment")}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg cursor-pointer transition-colors font-semibold text-sm whitespace-nowrap ${activeTab === "assessment" ? "bg-gray-50 text-[#0f172a]" : "text-gray-500 hover:bg-gray-50"}`}
+                    >
+                        <Calendar className="w-4 h-4" />
+                        计划考核
+                    </div>
+                    <div
                         onClick={() => setActiveTab("users")}
                         className={`flex items-center gap-2 px-6 py-2.5 rounded-lg cursor-pointer transition-colors font-semibold text-sm whitespace-nowrap ${activeTab === "users" ? "bg-gray-50 text-[#0f172a]" : "text-gray-500 hover:bg-gray-50"}`}
                     >
@@ -77,17 +85,19 @@ export default function AdminDashboard() {
 
                 {activeTab === "route" && <RouteTab />}
 
-                {activeTab === "plan" && (
+                {activeTab === "plan" && <PlanTab />}
+
+                {activeTab === "assessment" && (
                     <div className="bg-white rounded-2xl p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 animate-in fade-in duration-300">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">计划配置</h2>
+                            <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">计划考核</h2>
                             <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> 新建计划
+                                <Calendar className="w-4 h-4" /> 新建考核
                             </button>
                         </div>
                         <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/30">
                             <Calendar className="w-12 h-12 text-gray-300 mb-4" />
-                            <p className="text-gray-400 font-medium">巡检计划功能开发中...</p>
+                            <p className="text-gray-400 font-medium">计划考核功能开发中...</p>
                         </div>
                     </div>
                 )}

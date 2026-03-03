@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const checkpoints = await db.checkpoint.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { group: true }
+      include: { group: true, role: true }
     });
     return NextResponse.json(checkpoints);
   } catch (error: unknown) {
@@ -17,13 +17,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, nfcTagId, location, groupId, creatorId } = body;
+    const { name, nfcTagId, location, groupId, roleCode, creatorId } = body;
 
-    if (!name || !nfcTagId) {
-      return NextResponse.json({ error: 'Name and NFC Tag ID are required' }, { status: 400 });
+    if (!name || !nfcTagId || !groupId || !roleCode) {
+      return NextResponse.json({ error: 'Name, NFC Tag ID, Group ID and Role Code are required' }, { status: 400 });
     }
 
-    let targetGroupId = groupId || null;
+    let targetGroupId = groupId;
 
     if (creatorId) {
       const creator = await db.user.findUnique({
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
       if (creator && creator.roleCode === 'ADMIN') {
         // Admins can only create in their own group
-        targetGroupId = creator.groupId;
+        targetGroupId = creator.groupId || groupId;
       }
     }
 
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
         nfcTagId,
         location,
         groupId: targetGroupId,
+        roleCode,
       },
     });
 

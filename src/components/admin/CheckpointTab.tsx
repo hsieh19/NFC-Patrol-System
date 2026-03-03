@@ -8,12 +8,19 @@ interface Checkpoint {
     nfcTagId: string;
     name: string;
     location: string | null;
-    groupId: string | null;
-    group?: { id: string, name: string } | null;
+    groupId: string;
+    group?: { id: string, name: string };
+    roleCode: string;
+    role?: { code: string, name: string };
 }
 
 interface Group {
     id: string;
+    name: string;
+}
+
+interface Role {
+    code: string;
     name: string;
 }
 
@@ -27,12 +34,14 @@ export default function CheckpointTab() {
     const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
-    const [newData, setNewData] = useState({ name: "", nfcTagId: "", location: "", groupId: "" });
+    const [newData, setNewData] = useState({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "" });
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editData, setEditData] = useState({ name: "", nfcTagId: "", location: "", groupId: "" });
+    const [editData, setEditData] = useState({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "" });
     const [groups, setGroups] = useState<Group[]>([]);
+    const [roles, setRoles] = useState<Role[]>([]);
     const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
     const [groupFilter, setGroupFilter] = useState("");
+    const [roleFilter, setRoleFilter] = useState("");
 
 
     const fetchCheckpoints = async () => {
@@ -57,9 +66,24 @@ export default function CheckpointTab() {
         }
     };
 
+    const fetchRoles = async () => {
+        try {
+            const res = await fetch("/api/admin/roles");
+            const data = await res.json();
+            // 只获取运维人员和保安人员角色
+            const filteredRoles = data.filter((role: Role) => 
+                role.code === "OPERATOR" || role.code === "SECURITY"
+            );
+            setRoles(filteredRoles);
+        } catch (error) {
+            console.error("Failed to fetch roles:", error);
+        }
+    };
+
     useEffect(() => {
         fetchCheckpoints();
         fetchGroups();
+        fetchRoles();
         const userData = localStorage.getItem("user");
         if (userData) {
             const parsed = JSON.parse(userData);
@@ -68,7 +92,7 @@ export default function CheckpointTab() {
     }, []);
 
     const handleAdd = async () => {
-        if (!newData.name || !newData.nfcTagId) return;
+        if (!newData.name || !newData.nfcTagId || !newData.groupId || !newData.roleCode) return;
         try {
             const res = await fetch("/api/admin/checkpoints", {
                 method: "POST",
@@ -76,7 +100,7 @@ export default function CheckpointTab() {
                 body: JSON.stringify({ ...newData, creatorId: currentUser?.id }),
             });
             if (res.ok) {
-                setNewData({ name: "", nfcTagId: "", location: "", groupId: "" });
+                setNewData({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "" });
                 setIsAdding(false);
                 fetchCheckpoints();
             } else {
@@ -94,12 +118,13 @@ export default function CheckpointTab() {
             name: cp.name,
             nfcTagId: cp.nfcTagId,
             location: cp.location || "",
-            groupId: cp.groupId || ""
+            groupId: cp.groupId,
+            roleCode: cp.roleCode
         });
     };
 
     const handleEdit = async (id: string) => {
-        if (!editData.name || !editData.nfcTagId) return;
+        if (!editData.name || !editData.nfcTagId || !editData.groupId || !editData.roleCode) return;
         try {
             const res = await fetch(`/api/admin/checkpoints/${id}`, {
                 method: "PATCH",
@@ -130,11 +155,18 @@ export default function CheckpointTab() {
 
     if (loading) return <div className="py-20 text-center">加载中...</div>;
 
-    // Filter checkpoints by group name
+    // Filter checkpoints by group and role
     const filteredCheckpoints = checkpoints.filter(cp => {
-        if (!groupFilter) return true;
-        const groupName = cp.group?.name || '系统全局';
-        return groupName.toLowerCase().includes(groupFilter.toLowerCase());
+        // Filter by group
+        const groupMatch = !groupFilter || 
+            (cp.group?.name && cp.group.name.toLowerCase().includes(groupFilter.toLowerCase()));
+        
+        // Filter by role (only if group is matched)
+        const roleMatch = !roleFilter || 
+            (groupMatch && 
+             (cp.role?.name && cp.role.name.toLowerCase().includes(roleFilter.toLowerCase())));
+        
+        return groupMatch && roleMatch;
     });
 
     return (
@@ -148,6 +180,18 @@ export default function CheckpointTab() {
                             placeholder="筛选分组..."
                             value={groupFilter}
                             onChange={(e) => setGroupFilter(e.target.value)}
+                            className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="筛选角色..."
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value)}
                             className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -172,6 +216,7 @@ export default function CheckpointTab() {
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">点位名称</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">物理位置</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">所属分组</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-400 px-4">所属角色</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4 text-right">操作</th>
                         </tr>
                     </thead>
@@ -212,9 +257,21 @@ export default function CheckpointTab() {
                                         onChange={(e) => setNewData({ ...newData, groupId: e.target.value })}
                                         disabled={currentUser?.role === 'ADMIN'}
                                     >
-                                        <option value="">-- 系统全局 --</option>
+                                        <option value="">-- 请选择分组 --</option>
                                         {groups.map(g => (
                                             <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                </td>
+                                <td className="py-3 px-4">
+                                    <select
+                                        className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 disabled:opacity-50"
+                                        value={newData.roleCode}
+                                        onChange={(e) => setNewData({ ...newData, roleCode: e.target.value })}
+                                    >
+                                        <option value="">-- 请选择角色 --</option>
+                                        {roles.map(r => (
+                                            <option key={r.code} value={r.code}>{r.name}</option>
                                         ))}
                                     </select>
                                 </td>
@@ -257,25 +314,37 @@ export default function CheckpointTab() {
                                     </td>
                                     <td className="py-3 px-4">
                                         <select
-                                            className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 disabled:opacity-50"
-                                            value={editData.groupId}
-                                            onChange={(e) => setEditData({ ...editData, groupId: e.target.value })}
-                                            disabled={currentUser?.role === 'ADMIN'}
-                                        >
-                                            <option value="">-- 系统全局 --</option>
-                                            {groups.map(g => (
-                                                <option key={g.id} value={g.id}>{g.name}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td className="py-3 px-4 text-right flex justify-end gap-2">
-                                        <button onClick={() => handleEdit(cp.id)} className="p-1.5 text-green-600 hover:bg-green-100 rounded text-xs" title="保存">
-                                            <Check className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => setEditingId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded text-xs" title="取消">
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </td>
+                                        className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 disabled:opacity-50"
+                                        value={editData.groupId}
+                                        onChange={(e) => setEditData({ ...editData, groupId: e.target.value })}
+                                        disabled={currentUser?.role === 'ADMIN'}
+                                    >
+                                        <option value="">-- 请选择分组 --</option>
+                                        {groups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                </td>
+                                <td className="py-3 px-4">
+                                    <select
+                                        className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 disabled:opacity-50"
+                                        value={editData.roleCode}
+                                        onChange={(e) => setEditData({ ...editData, roleCode: e.target.value })}
+                                    >
+                                        <option value="">-- 请选择角色 --</option>
+                                        {roles.map(r => (
+                                            <option key={r.code} value={r.code}>{r.name}</option>
+                                        ))}
+                                    </select>
+                                </td>
+                                <td className="py-3 px-4 text-right flex justify-end gap-2">
+                                    <button onClick={() => handleEdit(cp.id)} className="p-1.5 text-green-600 hover:bg-green-100 rounded text-xs" title="保存">
+                                        <Check className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={() => setEditingId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded text-xs" title="取消">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </td>
                                 </tr>
                             ) : (
                                 <tr key={cp.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
@@ -285,6 +354,11 @@ export default function CheckpointTab() {
                                     <td className="py-4 px-4">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${cp.group ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
                                             {cp.group?.name || '系统全局'}
+                                        </span>
+                                    </td>
+                                    <td className="py-4 px-4">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${cp.role ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                                            {cp.role?.name || cp.roleCode}
                                         </span>
                                     </td>
                                     <td className="py-4 px-4 flex justify-end gap-1">

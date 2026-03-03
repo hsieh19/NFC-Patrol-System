@@ -14,6 +14,9 @@ model Role {
   description String?
   isSystem    Boolean  @default(false)
   users       User[]
+  checkpoints Checkpoint[]
+  routes      Route[]
+  plans       Plan[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -42,6 +45,7 @@ model UserGroup {
   users       User[]
   checkpoints Checkpoint[]
   routes      Route[]
+  plans       Plan[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -62,8 +66,10 @@ model Checkpoint {
   records   PatrolRecord[]
   repairs   RepairReport[]
   routeLinks RouteCheckpoint[]
-  groupId   String?
-  group     UserGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  groupId   String
+  group     UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  roleCode  String
+  role      Role @relation(fields: [roleCode], references: [code], onDelete: Cascade)
 }
 
 model Route {
@@ -74,8 +80,10 @@ model Route {
   plans       Plan[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  groupId     String?
-  group       UserGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  groupId     String
+  group       UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  roleCode    String
+  role        Role @relation(fields: [roleCode], references: [code], onDelete: Cascade)
 }
 
 model RouteCheckpoint {
@@ -91,13 +99,18 @@ model RouteCheckpoint {
 
 model Plan {
   id           String      @id @default(cuid())
-  name         String?     // 计划名称
+  name         String      // 计划名称
   routeId      String
   route        Route       @relation(fields: [routeId], references: [id])
   startTime    String      
   endTime      String      
   assignedTo   String?     // 可指定具体用户ID或角色编码
   frequency    String      @default("DAILY") 
+  planType     String      @default("ORDERED") // ORDERED 有序计划, UNORDERED 无序计划
+  groupId      String
+  group        UserGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  roleCode     String
+  role         Role        @relation(fields: [roleCode], references: [code], onDelete: Cascade)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 }

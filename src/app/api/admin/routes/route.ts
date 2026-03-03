@@ -8,6 +8,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
       include: {
         group: true,
+        role: true,
         checkpoints: {
           include: {
             checkpoint: true
@@ -25,17 +26,18 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, description, groupId, checkpoints } = body;
+    const { name, description, groupId, roleCode, checkpoints } = body;
 
-    if (!name) {
-      return NextResponse.json({ error: 'Route name is required' }, { status: 400 });
+    if (!name || !groupId || !roleCode) {
+      return NextResponse.json({ error: 'Route name, Group ID and Role Code are required' }, { status: 400 });
     }
 
     const route = await db.route.create({
       data: {
         name,
         description,
-        groupId: groupId || null,
+        groupId,
+        roleCode,
         checkpoints: checkpoints ? {
           create: checkpoints.map((cp: any, index: number) => ({
             checkpointId: cp.checkpointId,
@@ -45,6 +47,7 @@ export async function POST(req: NextRequest) {
       },
       include: {
         group: true,
+        role: true,
         checkpoints: {
           include: {
             checkpoint: true
