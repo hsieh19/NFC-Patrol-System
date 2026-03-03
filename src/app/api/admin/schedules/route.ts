@@ -21,7 +21,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, routeId, startTime, endTime, planType, groupId, roleCode } = body;
+    const { name, routeId, startTime, endTime, planType, groupId, roleCode, frequency } = body;
 
     if (!name || !routeId || !startTime || !endTime || !groupId || !roleCode) {
       return NextResponse.json({ error: 'Name, Route ID, Start Time, End Time, Group ID and Role Code are required' }, { status: 400 });
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
         startTime,
         endTime,
         planType: planType || 'ORDERED',
+        frequency: frequency || 'DAILY',
         groupId,
         roleCode
       },

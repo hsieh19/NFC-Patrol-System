@@ -8,7 +8,7 @@ export async function PATCH(
 ) {
   try {
     const p = await params;
-    const { name, routeId, startTime, endTime, planType, groupId, roleCode } = await req.json();
+    const { name, routeId, startTime, endTime, planType, groupId, roleCode, frequency } = await req.json();
 
     if (!name || !routeId || !startTime || !endTime || !groupId || !roleCode) {
       return NextResponse.json({ error: 'Name, Route ID, Start Time, End Time, Group ID and Role Code are required' }, { status: 400 });
@@ -22,6 +22,7 @@ export async function PATCH(
         startTime,
         endTime,
         planType: planType || 'ORDERED',
+        frequency: frequency || 'DAILY',
         groupId,
         roleCode
       },

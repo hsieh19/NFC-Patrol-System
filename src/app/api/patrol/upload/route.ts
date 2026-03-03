@@ -17,11 +17,38 @@ export async function POST(req: NextRequest) {
 
     if (!checkpoint) {
       // 调试阶段：如果点位未登记，自动创建一个临时点位，防止同步阻塞
+      // 查找或创建默认用户组
+      let defaultGroup = await db.userGroup.findFirst();
+      if (!defaultGroup) {
+        defaultGroup = await db.userGroup.create({
+          data: {
+            name: "默认分组",
+            description: "系统默认分组"
+          }
+        });
+      }
+      
+      // 查找或创建默认角色
+      let defaultRole = await db.role.findFirst({
+        where: { code: 'OPERATOR' }
+      });
+      if (!defaultRole) {
+        defaultRole = await db.role.create({
+          data: {
+            code: 'OPERATOR',
+            name: '运维人员',
+            isSystem: true
+          }
+        });
+      }
+      
       checkpoint = await db.checkpoint.create({
         data: {
           nfcTagId,
           name: `新标签 (${nfcTagId.substring(0, 6)})`,
           location: "待配置地址",
+          groupId: defaultGroup.id,
+          roleCode: defaultRole.code
         }
       });
       console.log(`[Testing] Auto-created checkpoint for: ${nfcTagId}`);
