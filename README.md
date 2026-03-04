@@ -95,11 +95,60 @@ npm run dev
 # - 正常登录请访问 /login
 ```
 
-### 生产构建
+### 生产构建 (Bare Metal)
 ```bash
 npm run build
 npm run start
 ```
+
+---
+
+## 🏗 生产环境部署 (Docker)
+
+推荐使用 Docker 进行容器化部署，本项目已内置多阶段构建优化的 `Dockerfile`。
+
+### 1. 自动构建
+每当向 GitHub 推送以 `v` 开头的标签（如 `v1.0.0`）时，GitHub Actions 会自动构建镜像并推送到 **GitHub Container Registry (GHCR)**。
+
+### 2. 手动构建与运行
+```bash
+# 构建镜像
+docker build -t nfc-patrol-system .
+
+# 运行容器 (使用外部配置文件)
+docker run -d \
+  --name nfc-system \
+  -p 3000:3000 \
+  --env-file .env \
+  nfc-patrol-system
+```
+
+### 3. Docker Compose 示例
+```yaml
+services:
+  app:
+    image: ghcr.io/${YOUR_GITHUB_ID}/nfc-patrol-system:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - DB_TYPE=mysql # 强制使用外部 MySQL
+    restart: always
+```
+
+---
+
+## 🔐 生产环境关键注意事项
+
+### 1. 必须启用 HTTPS
+**核心提醒**：由于 Web NFC API 的安全限制，系统必须在 **HTTPS** 环境下运行，否则移动端无法调用感应功能。建议在 Docker 前层挂载 **Nginx** 进行 SSL 卸载。
+
+### 2. JWT 安全
+生产环境务必在 `.env` 中修改 `JWT_SECRET` 为至少 32 位的随机字符串。
+
+### 3. 数据库库选型
+生产环境强烈建议将 `DB_TYPE` 设为 `mysql`，并连接独立的 MySQL 8.0 数据库以获得更好的并发性能。
 
 ---
 
