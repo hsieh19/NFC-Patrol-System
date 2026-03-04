@@ -9,6 +9,7 @@ interface Checkpoint {
     name: string;
     location: string | null;
     groupId: string | null;
+    roleCode?: string;
     group?: { id: string, name: string } | null;
 }
 
@@ -58,7 +59,7 @@ export default function RouteTab() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [groupFilter, setGroupFilter] = useState("");
     const [roleFilter, setRoleFilter] = useState("");
-    
+
     // Form data
     const [routeForm, setRouteForm] = useState({
         name: "",
@@ -66,7 +67,7 @@ export default function RouteTab() {
         groupId: "",
         roleCode: ""
     });
-    
+
     // Route checkpoints
     const [routeCheckpoints, setRouteCheckpoints] = useState<RouteCheckpoint[]>([]);
     const [availableCheckpoints, setAvailableCheckpoints] = useState<Checkpoint[]>([]);
@@ -109,7 +110,7 @@ export default function RouteTab() {
             const res = await fetch("/api/admin/roles");
             const data = await res.json();
             // 只获取运维人员和保安人员角色
-            const filteredRoles = data.filter((role: Role) => 
+            const filteredRoles = data.filter((role: Role) =>
                 role.code === "OPERATOR" || role.code === "SECURITY"
             );
             setRoles(filteredRoles);
@@ -124,7 +125,7 @@ export default function RouteTab() {
             const parsed = JSON.parse(userData);
             setCurrentUser(parsed);
         }
-        
+
         const loadData = async () => {
             await fetchRoutes();
             await fetchCheckpoints();
@@ -132,13 +133,13 @@ export default function RouteTab() {
             await fetchRoles();
             setLoading(false);
         };
-        
+
         loadData();
     }, []);
 
     const handleAddRoute = async () => {
         if (!routeForm.name || !routeForm.groupId || !routeForm.roleCode) return;
-        
+
         try {
             const res = await fetch("/api/admin/routes", {
                 method: "POST",
@@ -151,7 +152,7 @@ export default function RouteTab() {
                     }))
                 }),
             });
-            
+
             if (res.ok) {
                 setIsAdding(false);
                 resetForm();
@@ -167,7 +168,7 @@ export default function RouteTab() {
 
     const handleEditRoute = async (id: string) => {
         if (!routeForm.name || !routeForm.groupId || !routeForm.roleCode) return;
-        
+
         try {
             const res = await fetch(`/api/admin/routes/${id}`, {
                 method: "PATCH",
@@ -180,7 +181,7 @@ export default function RouteTab() {
                     }))
                 }),
             });
-            
+
             if (res.ok) {
                 setEditingId(null);
                 resetForm();
@@ -197,7 +198,7 @@ export default function RouteTab() {
 
     const handleDeleteRoute = async (id: string) => {
         if (!confirm("确定要删除该路线吗？关联的计划将被取消。")) return;
-        
+
         try {
             const res = await fetch(`/api/admin/routes/${id}`, { method: "DELETE" });
             if (res.ok) {
@@ -216,10 +217,10 @@ export default function RouteTab() {
             groupId: route.groupId,
             roleCode: route.roleCode
         });
-        
+
         // Load route checkpoints
         setRouteCheckpoints(route.checkpoints || []);
-        
+
         // Update available checkpoints
         const usedCheckpointIds = (route.checkpoints || []).map(cp => cp.checkpointId);
         let filteredCheckpoints = checkpoints.filter(cp => !usedCheckpointIds.includes(cp.id));
@@ -242,8 +243,8 @@ export default function RouteTab() {
             setAvailableCheckpoints(checkpoints.filter(cp => !usedCheckpointIds.includes(cp.id)));
         } else {
             const usedCheckpointIds = routeCheckpoints.map(cp => cp.checkpointId);
-            const filteredCheckpoints = checkpoints.filter(cp => 
-                !usedCheckpointIds.includes(cp.id) && 
+            const filteredCheckpoints = checkpoints.filter(cp =>
+                !usedCheckpointIds.includes(cp.id) &&
                 cp.roleCode === routeForm.roleCode
             );
             setAvailableCheckpoints(filteredCheckpoints);
@@ -258,7 +259,7 @@ export default function RouteTab() {
             checkpoint,
             order: routeCheckpoints.length
         };
-        
+
         setRouteCheckpoints([...routeCheckpoints, newCheckpoint]);
         setAvailableCheckpoints(availableCheckpoints.filter(cp => cp.id !== checkpoint.id));
     };
@@ -268,11 +269,11 @@ export default function RouteTab() {
         if (removedCheckpoint) {
             setAvailableCheckpoints([...availableCheckpoints, removedCheckpoint.checkpoint]);
         }
-        
+
         const updatedCheckpoints = routeCheckpoints
             .filter(cp => cp.checkpointId !== checkpointId)
             .map((cp, index) => ({ ...cp, order: index }));
-        
+
         setRouteCheckpoints(updatedCheckpoints);
     };
 
@@ -280,7 +281,7 @@ export default function RouteTab() {
         const result = [...routeCheckpoints];
         const [movedItem] = result.splice(fromIndex, 1);
         result.splice(toIndex, 0, movedItem);
-        
+
         // Update order numbers
         const updatedCheckpoints = result.map((cp, index) => ({ ...cp, order: index }));
         setRouteCheckpoints(updatedCheckpoints);
@@ -291,14 +292,14 @@ export default function RouteTab() {
     // Filter routes by group and role
     const filteredRoutes = routes.filter(route => {
         // Filter by group
-        const groupMatch = !groupFilter || 
+        const groupMatch = !groupFilter ||
             (route.group?.name && route.group.name.toLowerCase().includes(groupFilter.toLowerCase()));
-        
+
         // Filter by role (only if group is matched)
-        const roleMatch = !roleFilter || 
-            (groupMatch && 
-             (route.role?.name && route.role.name.toLowerCase().includes(roleFilter.toLowerCase())));
-        
+        const roleMatch = !roleFilter ||
+            (groupMatch &&
+                (route.role?.name && route.role.name.toLowerCase().includes(roleFilter.toLowerCase())));
+
         return groupMatch && roleMatch;
     });
 

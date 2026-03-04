@@ -17,24 +17,34 @@ export const config = {
     ],
 };
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     // 检查是否在登录页面，如果是的话不拦截（上面的 matcher 已经排除了 login，但这里可以再次防范）
     const pathname = request.nextUrl.pathname;
     if (pathname.startsWith('/login') || pathname.startsWith('/init')) {
         return NextResponse.next();
     }
 
-    // 检查是否有登录凭证（比如本地 cookie 中是否包含 token）
-    // 注意：在实际项目中，这里应该验证 Token 的有效性
+    // JWT Verification
     const token = request.cookies.get('token')?.value;
 
+    const loginUrl = new URL('/login', request.url);
+
     if (!token) {
-        // 如果没有 token，重定向到登录页
-        // 使用 request.url 作为源 URL 构建完整的重定向 URL
-        const loginUrl = new URL('/login', request.url);
         return NextResponse.redirect(loginUrl);
     }
 
-    // 放行
-    return NextResponse.next();
+    try {
+        const secret = process.env.JWT_SECRET || 'nfc-patrol-system-super-secret-key-change-in-prod';
+        const encoder = new TextEncoder();
+
+        // Dynamic import logic since we use JOSE edge-compatible JWT verification
+        const { jwtVerify } = await import('jose');
+        await jwtVerify(token, encoder.encode(secret));
+
+        // Token is valid, proceed
+        return NextResponse.next();
+    } catch (error) {
+        // Token format incorrect, expired, or tampered with
+        return NextResponse.redirect(loginUrl);
+    }
 }

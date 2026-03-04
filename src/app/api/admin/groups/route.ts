@@ -26,10 +26,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Name is required' }, { status: 400 });
         }
 
+        const xss = (await import('xss')).default;
         const group = await db.userGroup.create({
             data: {
-                name,
-                description: description || '',
+                name: xss(name),
+                description: description ? xss(description) : '',
             },
         });
 

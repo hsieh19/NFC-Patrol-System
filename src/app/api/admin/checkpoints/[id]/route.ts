@@ -19,26 +19,30 @@ export async function PATCH(
     const { nfcTagId, name, location, groupId, roleCode, creatorId } = await req.json();
     console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId, roleCode, creatorId });
 
+    const { getAuthUser } = await import('@/lib/auth');
+    const creator = await getAuthUser(req);
+
     let targetGroupId = groupId;
 
-    if (creatorId) {
-      const creator = await db.user.findUnique({
-        where: { id: creatorId }
-      });
-
-      if (creator && creator.roleCode === 'ADMIN') {
-        // Admins can only update in their own group
+    if (creator) {
+      if (creator.roleCode === 'ADMIN') {
         const checkpoint = await db.checkpoint.findUnique({
           where: { id: p.id }
         });
-        // Keep the existing group ID for admins
         targetGroupId = checkpoint?.groupId || creator.groupId || groupId;
       }
     }
 
+    const xss = (await import('xss')).default;
     const checkpoint = await db.checkpoint.update({
       where: { id: p.id },
-      data: { nfcTagId, name, location, groupId: targetGroupId, roleCode },
+      data: {
+        nfcTagId: xss(nfcTagId),
+        name: xss(name),
+        location: location ? xss(location) : null,
+        groupId: targetGroupId,
+        roleCode
+      },
     });
     return NextResponse.json(checkpoint);
   } catch (error: unknown) {

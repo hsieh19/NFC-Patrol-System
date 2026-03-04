@@ -20,10 +20,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // No strictly separated portals for now, allow all valid users to login
+    const tokenPayload = {
+      id: user.id,
+      username: user.username || '',
+      name: user.name,
+      roleCode: user.roleCode,
+      groupId: user.groupId,
+    };
+    const { signToken } = await import('@/lib/auth');
+    const token = await signToken(tokenPayload);
 
     return NextResponse.json({
       success: true,
+      token,
       user: {
         id: user.id,
         username: user.username,

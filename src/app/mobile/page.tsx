@@ -468,7 +468,7 @@ export default function MobileHome() {
         )}
 
         <div className="mt-4 text-center text-[10px] text-gray-400 uppercase tracking-[0.2em]">
-          Powered by Xungeng Digital Command
+          Powered by NFC-Patrol-System Digital Command
         </div>
 
         {/* 语音选择器 */}

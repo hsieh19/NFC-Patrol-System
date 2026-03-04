@@ -44,12 +44,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Route name, Group ID and Role Code are required' }, { status: 400 });
     }
 
+    const xss = (await import('xss')).default;
     // Update route
     const route = await db.route.update({
       where: { id: p.id },
       data: {
-        name,
-        description,
+        name: xss(name),
+        description: description ? xss(description) : null,
         groupId,
         roleCode
       }

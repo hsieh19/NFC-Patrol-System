@@ -27,9 +27,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name, Route ID, Start Time, End Time, Group ID and Role Code are required' }, { status: 400 });
     }
 
+    const xss = (await import('xss')).default;
+
     const schedule = await db.plan.create({
       data: {
-        name,
+        name: xss(name),
         routeId,
         startTime,
         endTime,

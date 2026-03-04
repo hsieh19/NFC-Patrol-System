@@ -26,10 +26,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Name, Route ID, Start Time, End Time, Group ID and Role Code are required' }, { status: 400 });
     }
 
+    const xss = (await import('xss')).default;
     const schedule = await db.plan.update({
       where: { id: p.id },
       data: {
-        name, routeId, startTime, endTime,
+        name: xss(name), routeId, startTime, endTime,
         planType: planType || 'ORDERED',
         frequency: frequency || 'DAILY',
         groupId, roleCode

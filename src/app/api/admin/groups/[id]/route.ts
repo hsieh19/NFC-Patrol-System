@@ -11,11 +11,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Name is required' }, { status: 400 });
         }
 
+        const xss = (await import('xss')).default;
         const group = await db.userGroup.update({
             where: { id },
             data: {
-                name,
-                description: description || '',
+                name: xss(name),
+                description: description ? xss(description) : '',
             },
         });
 

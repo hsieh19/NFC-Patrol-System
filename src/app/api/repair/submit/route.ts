@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { SYSTEM_CONSTANTS } from '@/lib/constants';
+
 export async function POST(req: NextRequest) {
   try {
     const { description, photo, userId } = await req.json();
@@ -23,21 +25,21 @@ export async function POST(req: NextRequest) {
         // 数据库全空时，直接创建一个防呆操作员
         user = await db.user.create({
           data: {
-            username: 'system_admin',
-            name: '系统自动生成用户',
+            username: SYSTEM_CONSTANTS.DEFAULT_ADMIN_USERNAME,
+            name: SYSTEM_CONSTANTS.DEFAULT_ADMIN_NAME,
             roleCode: 'ADMIN',
-            department: '研发测试部'
+            department: SYSTEM_CONSTANTS.DEFAULT_DEPARTMENT
           }
         });
       }
     }
 
-    // 2. Find the last checkpoint scanned by this user in the last 15 minutes to auto-locate
+    // 2. Find the last checkpoint scanned by this user in the last X minutes to auto-locate
     const lastRecord = await db.patrolRecord.findFirst({
       where: {
         userId: userId,
         createdAt: {
-          gt: new Date(Date.now() - 15 * 60 * 1000), // 15 mins ago
+          gt: new Date(Date.now() - SYSTEM_CONSTANTS.REPAIR_AUTO_LOCATE_TIME_WINDOW_MS),
         },
       },
       include: { checkpoint: true },
@@ -63,8 +65,8 @@ export async function POST(req: NextRequest) {
         description,
         userId: user.id,
         checkpointId: cpId || undefined,
-        imageUrls: photo ? 'DATA_URL_IMAGE' : '',
-        status: 'PENDING',
+        imageUrls: photo ? SYSTEM_CONSTANTS.PLACEHOLDER_IMAGE_URL : '',
+        status: SYSTEM_CONSTANTS.REPAIR_STATUS_PENDING,
       },
     });
 

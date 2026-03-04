@@ -23,24 +23,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name, NFC Tag ID, Group ID and Role Code are required' }, { status: 400 });
     }
 
+    const { getAuthUser } = await import('@/lib/auth');
+    const creator = await getAuthUser(req);
+
     let targetGroupId = groupId;
 
-    if (creatorId) {
-      const creator = await db.user.findUnique({
-        where: { id: creatorId }
-      });
-
-      if (creator && creator.roleCode === 'ADMIN') {
+    if (creator) {
+      if (creator.roleCode === 'ADMIN') {
         // Admins can only create in their own group
         targetGroupId = creator.groupId || groupId;
       }
     }
 
+    const xss = (await import('xss')).default;
     const checkpoint = await db.checkpoint.create({
       data: {
-        name,
-        nfcTagId,
-        location,
+        name: xss(name),
+        nfcTagId: xss(nfcTagId),
+        location: location ? xss(location) : null,
         groupId: targetGroupId,
         roleCode,
       },

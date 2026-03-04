@@ -24,7 +24,7 @@ export class OfflineDB extends Dexie {
   repairReports!: Table<LocalRepairReport>;
 
   constructor() {
-    super('XungengOffline');
+    super('NFCPatrolSystemOffline');
     this.version(1).stores({
       patrolRecords: '++id, checkpointId, nfcTagId, timestamp, synced',
       repairReports: '++id, checkpointId, timestamp, synced'

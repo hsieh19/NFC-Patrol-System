@@ -51,6 +51,16 @@ export async function GET(req: NextRequest) {
             orderBy: { createdAt: 'asc' }
         });
 
+        // 优化：按 checkpointId 预先分组记录，将原先 O(N*P*D) 的过滤复杂度降至 O(N + P*D*C)
+        const recordsByCheckpoint: Record<string, typeof allRecords> = {};
+        for (const r of allRecords) {
+            if (!r.checkpointId) continue;
+            if (!recordsByCheckpoint[r.checkpointId]) {
+                recordsByCheckpoint[r.checkpointId] = [];
+            }
+            recordsByCheckpoint[r.checkpointId].push(r);
+        }
+
         const now = new Date();
 
         // 每个计划 × 每一天 = 一条考核记录
@@ -71,16 +81,31 @@ export async function GET(req: NextRequest) {
                     planEnd = addDays(planEnd, 1);
                 }
 
-                // 该天该计划的打卡记录
-                const dayRecords = allRecords.filter(r =>
-                    r.createdAt >= planStart &&
-                    r.createdAt <= planEnd &&
-                    planCheckpointIds.includes(r.checkpointId ?? '')
-                );
-
                 const checkpointCount = planCheckpointIds.length;
-                const visitedSet = new Set(dayRecords.map(r => r.checkpointId));
-                const visitedCount = visitedSet.size;
+                let visitedCount = 0;
+
+                // 巡检点明细
+                const checkpoints = plan.route.checkpoints.map(rcp => {
+                    const cpRecords = recordsByCheckpoint[rcp.checkpointId] || [];
+                    // 获取在该时间段内的所有记录打卡
+                    const validRecords = cpRecords.filter(r => r.createdAt >= planStart && r.createdAt <= planEnd);
+                    const record = validRecords[0]; // 默认取第一条作为状态展示
+
+                    if (record) {
+                        visitedCount++;
+                    }
+
+                    return {
+                        checkpointId: rcp.checkpointId,
+                        name: rcp.checkpoint.name,
+                        order: rcp.order,
+                        isvisited: !!record,
+                        visitCount: validRecords.length,
+                        visitedAt: record ? record.createdAt : null,
+                        status: record ? 'NORMAL' : 'MISSING'
+                    };
+                });
+
                 const progress = checkpointCount > 0 ? Math.round((visitedCount / checkpointCount) * 100) : 0;
 
                 // 状态判定
@@ -96,20 +121,6 @@ export async function GET(req: NextRequest) {
                 } else {
                     status = 'NOT_STARTED';
                 }
-
-                // 巡检点明细
-                const checkpoints = plan.route.checkpoints.map(rcp => {
-                    const record = dayRecords.find(r => r.checkpointId === rcp.checkpointId);
-                    return {
-                        checkpointId: rcp.checkpointId,
-                        name: rcp.checkpoint.name,
-                        order: rcp.order,
-                        isvisited: !!record,
-                        visitCount: dayRecords.filter(r => r.checkpointId === rcp.checkpointId).length,
-                        visitedAt: record ? record.createdAt : null,
-                        status: record ? 'NORMAL' : 'MISSING'
-                    };
-                });
 
                 assessmentResults.push({
                     id: `${plan.id}_${format(day, 'yyyy-MM-dd')}`,

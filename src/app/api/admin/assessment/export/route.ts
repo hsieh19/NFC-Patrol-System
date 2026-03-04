@@ -66,6 +66,16 @@ export async function GET(req: NextRequest) {
             orderBy: { createdAt: 'asc' }
         });
 
+        // 优化缓存：防止 O(N*P*D)
+        const recordsByCheckpoint: Record<string, typeof allRecords> = {};
+        for (const r of allRecords) {
+            if (!r.checkpointId) continue;
+            if (!recordsByCheckpoint[r.checkpointId]) {
+                recordsByCheckpoint[r.checkpointId] = [];
+            }
+            recordsByCheckpoint[r.checkpointId].push(r);
+        }
+
         // CSV 构建
         const escapeCSV = (v: string | null | undefined) =>
             `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -101,16 +111,11 @@ export async function GET(req: NextRequest) {
 
                 const planCheckpointIds = plan.route.checkpoints.map(cp => cp.checkpointId);
 
-                // 该计划当天的打卡记录
-                const dayRecords = allRecords.filter(r =>
-                    r.createdAt >= planStart &&
-                    r.createdAt <= planEnd &&
-                    planCheckpointIds.includes(r.checkpointId ?? '')
-                );
-
                 // 每个巡检点一行
                 for (const rcp of plan.route.checkpoints) {
-                    const record = dayRecords.find(r => r.checkpointId === rcp.checkpointId);
+                    const cpRecords = recordsByCheckpoint[rcp.checkpointId] || [];
+                    const record = cpRecords.find(r => r.createdAt >= planStart && r.createdAt <= planEnd);
+
                     const visitedAtStr = record ? format(record.createdAt, 'yyyy-MM-dd HH:mm:ss') : '';
                     const patrollerName = record?.user?.name ?? '';
 

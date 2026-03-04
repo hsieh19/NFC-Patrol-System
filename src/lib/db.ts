@@ -2,17 +2,17 @@ import { PrismaClient } from '@prisma/client';
 
 const getDatabaseUrl = () => {
   const dbType = process.env.DB_TYPE || 'sqlite';
-  
+
   if (dbType === 'sqlite') {
     return 'file:./dev.db';
   }
-  
+
   const host = process.env.MYSQL_HOST || 'localhost';
   const port = process.env.MYSQL_PORT || '3306';
   const user = process.env.MYSQL_USER || 'root';
   const password = process.env.MYSQL_PASSWORD || '';
-  const database = process.env.MYSQL_DATABASE || 'xungeng';
-  
+  const database = process.env.MYSQL_DATABASE || 'nfc_patrol_system';
+
   return `mysql://${user}:${password}@${host}:${port}/${database}`;
 };
 

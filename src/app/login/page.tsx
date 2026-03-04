@@ -33,8 +33,8 @@ export default function LoginPage() {
             const data = await res.json();
 
             if (res.ok && data.success) {
-                // 写入简单 Cookie 用于中间件拦截验证
-                document.cookie = `token=auth_${data.user.id}; path=/; max-age=86400`;
+                // 写入真实 JWT 用于中间件拦截验证
+                document.cookie = `token=${data.token}; path=/; max-age=86400`;
 
                 // 存储用户信息供前端调用
                 localStorage.setItem("user", JSON.stringify({

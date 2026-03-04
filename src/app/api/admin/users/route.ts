@@ -13,9 +13,8 @@ export async function GET() {
       include: { group: true, role: true }
     });
     const safeUsers = users.map(user => {
-      const clone = { ...user };
-      delete clone.password;
-      return clone;
+      const { password, ...safeUser } = user;
+      return safeUser;
     });
     return NextResponse.json(safeUsers);
   } catch (error: unknown) {
@@ -38,41 +37,38 @@ export async function POST(req: NextRequest) {
     const targetRoleCode = roleCode || 'OPERATOR';
 
     // Role-based logic
-    if (creatorId) {
-      const creator = await db.user.findUnique({
-        where: { id: creatorId },
-        include: { role: true }
-      });
+    const { getAuthUser } = await import('@/lib/auth');
+    const creator = await getAuthUser(req);
 
-      if (creator) {
-        if (creator.roleCode === 'ADMIN') {
-          const allowedRoles = ['ADMIN', 'OPERATOR', 'SECURITY'];
-          if (!allowedRoles.includes(targetRoleCode)) {
-            return NextResponse.json({ error: '管理员无权分配此角色' }, { status: 403 });
-          }
-          // Same group as creator
-          targetGroupId = creator.groupId;
-        } else if (creator.roleCode !== 'SUPER_ADMIN') {
-          return NextResponse.json({ error: '无权新建人员' }, { status: 403 });
+    if (creator) {
+      if (creator.roleCode === 'ADMIN') {
+        const allowedRoles = ['ADMIN', 'OPERATOR', 'SECURITY'];
+        if (!allowedRoles.includes(targetRoleCode)) {
+          return NextResponse.json({ error: '管理员无权分配此角色' }, { status: 403 });
         }
+        // Same group as creator
+        targetGroupId = creator.groupId;
+      } else if (creator.roleCode !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: '无权新建人员' }, { status: 403 });
       }
     }
 
-    const defaultPassword = await bcrypt.hash('123456', 10);
+    const xss = (await import('xss')).default;
+    const initialPassword = process.env.DEFAULT_PASSWORD || '123456';
+    const defaultPassword = await bcrypt.hash(initialPassword, 10);
 
     const user = await db.user.create({
       data: {
-        username: username || `user_${Date.now()}`,
+        username: username ? xss(username) : `user_${Date.now()}`,
         password: defaultPassword,
-        name,
+        name: xss(name),
         roleCode: targetRoleCode,
-        department: department || '手动维护',
+        department: department ? xss(department) : '手动维护',
         groupId: targetGroupId,
       },
     });
 
-    const createdUser = { ...user };
-    delete createdUser.password;
+    const { password, ...createdUser } = user;
     return NextResponse.json(createdUser);
   } catch (error: unknown) {
     return createErrorResponse(error, 'Internal Server Error');

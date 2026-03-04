@@ -32,10 +32,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Route name, Group ID and Role Code are required' }, { status: 400 });
     }
 
+    const xss = (await import('xss')).default;
+
     const route = await db.route.create({
       data: {
-        name,
-        description,
+        name: xss(name),
+        description: description ? xss(description) : null,
         groupId,
         roleCode,
         checkpoints: checkpoints ? {

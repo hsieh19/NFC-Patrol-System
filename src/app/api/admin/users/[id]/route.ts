@@ -20,10 +20,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Name is required' }, { status: 400 });
         }
 
+        const xss = (await import('xss')).default;
+
         const data: Partial<UserUpdatePayload> & { name: string; roleCode: string; department: string; groupId: string | null } = {
-            name,
+            name: xss(name),
             roleCode: roleCode || 'OPERATOR',
-            department: department || '手动维护',
+            department: department ? xss(department) : '手动维护',
             groupId: groupId || null,
         };
 
@@ -36,7 +38,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             data,
         });
 
-        const { password, ...safeUser } = user;
+        const { password: _newPasswordHash, ...safeUser } = user;
         return NextResponse.json(safeUser);
     } catch (error: unknown) {
         if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'P2002') {
