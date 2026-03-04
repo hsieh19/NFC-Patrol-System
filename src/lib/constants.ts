@@ -10,7 +10,7 @@ export const SYSTEM_CONSTANTS = {
     // Fallback / Defaults
     DEFAULT_ADMIN_USERNAME: 'system_admin',
     DEFAULT_ADMIN_NAME: '系统自动生成用户',
-    DEFAULT_DEPARTMENT: '研发测试部',
+    DEFAULT_DEPARTMENT: '默认分组',
 
     // Statuses
     REPAIR_STATUS_PENDING: 'PENDING',
@@ -24,4 +24,36 @@ export const SYSTEM_CONSTANTS = {
     PLAN_TYPE_UNORDERED: 'UNORDERED',
 
     FREQUENCY_DAILY: 'DAILY',
+
+    // Role Definitions
+    INITIAL_ROLES: [
+        {
+            code: 'SUPER_ADMIN',
+            name: '超级管理员',
+            description: '拥有所有权限的系统最高管理角色',
+            isSystem: true,
+            permissions: ['ALL']
+        },
+        {
+            code: 'ADMIN',
+            name: '管理员',
+            description: '管理人员及巡检配置，但不具备系统级配置权限',
+            isSystem: true,
+            permissions: ['ADMIN_DASHBOARD', 'ADMIN_USER_MANAGE', 'ADMIN_CHECKPOINT', 'ADMIN_SCHEDULE', 'ADMIN_MONITOR', 'APP_SCAN', 'APP_REPAIR']
+        },
+        {
+            code: 'OPERATOR',
+            name: '运维人员',
+            description: '负责设备维护与巡检执行',
+            isSystem: true,
+            permissions: ['APP_SCAN', 'APP_REPAIR', 'ADMIN_MONITOR']
+        },
+        {
+            code: 'SECURITY',
+            name: '保安人员',
+            description: '负责常规巡逻打卡',
+            isSystem: true,
+            permissions: ['APP_SCAN']
+        }
+    ]
 } as const;

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { offlineDb } from "@/lib/offline-db";
 import { useSync } from "@/hooks/use-sync";
 import { toast } from "sonner";
+import pkg from "../../../package.json";
 
 export default function MobileHome() {
   const router = useRouter();
@@ -365,7 +366,10 @@ export default function MobileHome() {
       <header className="bg-white dark:bg-zinc-900 shadow-sm flex flex-col transition-colors">
         <div className="px-6 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">巡更系统</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">巡更系统</h1>
+              <span className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-[10px] font-bold text-gray-400">v{pkg.version}</span>
+            </div>
             <div className="flex items-center gap-2 mt-0.5">
               {isOnline ? (
                 <span className="flex items-center gap-1 text-[10px] text-green-500 font-bold uppercase tracking-wider">

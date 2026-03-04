@@ -19,28 +19,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `NFC Tag ${nfcTagId} is not a registered checkpoint` }, { status: 404 });
     }
 
-    // 2. Ensure User exists (handle mock/unknown users during testing)
-    let actualUserId = userId;
+    // 2. Ensure User exists (MUST exist for valid records)
     const userExists = await db.user.findUnique({ where: { id: userId } });
-
     if (!userExists) {
-      // Find the first admin or any user as fallback
-      let adminUser = await db.user.findFirst({
-        where: { roleCode: 'ADMIN' }
-      });
-
-      if (!adminUser) {
-        adminUser = await db.user.create({
-          data: {
-            username: 'admin',
-            name: 'admin',
-            // Fallback default admin role Code
-            roleCode: 'ADMIN',
-          }
-        });
-      }
-      actualUserId = adminUser.id;
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
+    const actualUserId = userId;
 
     // 3. Create OR Upsert the record
     let record;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { createErrorResponse } from '@/lib/api-error';
+import { SYSTEM_CONSTANTS } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,47 +20,25 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 2. Seed system roles first (ensure they exist)
-    const roles = [
-      {
-        code: 'SUPER_ADMIN',
-        name: '超级管理员',
-        description: '拥有所有权限的系统最高管理角色',
-        isSystem: true,
-        permissions: JSON.stringify(['ALL'])
-      },
-      {
-        code: 'ADMIN',
-        name: '管理员',
-        description: '管理人员及巡检配置，但不具备系统级配置权限',
-        isSystem: true,
-        permissions: JSON.stringify(['ADMIN_DASHBOARD', 'ADMIN_USER_MANAGE', 'ADMIN_CHECKPOINT', 'ADMIN_SCHEDULE', 'ADMIN_MONITOR', 'APP_SCAN', 'APP_REPAIR'])
-      },
-      {
-        code: 'OPERATOR',
-        name: '运维人员',
-        description: '负责设备维护与巡检执行',
-        isSystem: true,
-        permissions: JSON.stringify(['APP_SCAN', 'APP_REPAIR', 'ADMIN_MONITOR'])
-      },
-      {
-        code: 'SECURITY',
-        name: '保安人员',
-        description: '负责常规巡逻打卡',
-        isSystem: true,
-        permissions: JSON.stringify(['APP_SCAN'])
-      }
-    ];
-
-    // Create roles one by one to ensure they exist
-    for (const role of roles) {
+    // 2. Seed system roles (using shared configuration)
+    for (const role of SYSTEM_CONSTANTS.INITIAL_ROLES) {
       try {
-        const createdRole = await db.role.upsert({
+        await db.role.upsert({
           where: { code: role.code },
-          update: role,
-          create: role
+          update: {
+            name: role.name,
+            description: role.description,
+            isSystem: role.isSystem,
+            permissions: JSON.stringify(role.permissions)
+          },
+          create: {
+            code: role.code,
+            name: role.name,
+            description: role.description,
+            isSystem: role.isSystem,
+            permissions: JSON.stringify(role.permissions)
+          }
         });
-        console.log(`Created/updated role: ${createdRole.code}`);
       } catch (error) {
         console.error(`Error creating role ${role.code}:`, error);
       }

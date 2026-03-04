@@ -10,6 +10,7 @@ import RouteTab from "@/components/admin/RouteTab";
 import PlanTab from "@/components/admin/PlanTab";
 import UserTab from "@/components/admin/UserTab";
 import AssessmentTab from "@/components/admin/AssessmentTab";
+import pkg from "../../../package.json";
 
 export default function AdminDashboard() {
     const router = useRouter();
@@ -139,7 +140,16 @@ export default function AdminDashboard() {
                 <div>
                     {/* 软件标题 */}
                     <div className="p-6 mb-2">
-                        <h1 className="text-xl font-bold tracking-tight text-[#0f172a]">运维南区巡更系统</h1>
+                        <div className="flex flex-col gap-0.5">
+                            <h1 className="text-xl font-black tracking-tighter text-[#0f172a]">运维南区巡更系统</h1>
+                            <p className="text-xs font-semibold text-slate-400 flex items-center gap-2">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                系统版本 v{pkg.version}
+                            </p>
+                        </div>
                     </div>
 
                     {/* 菜单部分 */}
