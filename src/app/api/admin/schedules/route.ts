@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const showArchived = searchParams.get('archived') === 'true';
+
     const schedules = await db.plan.findMany({
-      include: {
-        route: true,
-        group: true,
-        role: true
-      },
+      where: showArchived ? { isArchived: true } : { isArchived: false },
+      include: { route: true, group: true, role: true },
       orderBy: { createdAt: 'desc' },
     });
     return NextResponse.json(schedules);

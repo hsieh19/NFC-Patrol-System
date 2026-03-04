@@ -157,22 +157,41 @@ export default function MobileConfigPage() {
         }
     };
 
-    // 模拟读取 NFC 标签
-    const handleNfcScan = () => {
-        setIsScanning(true);
-        // 模拟感应过程
-        setTimeout(() => {
-            const mockTagIds = ["TAG_OFFICE_01", "TAG_STAIRS_02", "TAG_LOBBY_03", "TAG_NEW_POINT"];
-            const randomTag = mockTagIds[Math.floor(Math.random() * mockTagIds.length)];
-            setFormData(prev => ({ ...prev, nfcTagId: randomTag }));
-            setIsScanning(false);
-            toast.success("标签读取成功");
+    // 真实读取 NFC 标签
+    const handleNfcScan = async () => {
+        if (!("NDEFReader" in window)) {
+            toast.error("浏览器不支持 NFC");
+            return;
+        }
 
-            // 触觉反馈
-            if ("vibrate" in navigator) {
-                navigator.vibrate(200);
-            }
-        }, 1500);
+        setIsScanning(true);
+        try {
+            const ndef = new (window as any).NDEFReader();
+            await ndef.scan();
+
+            toast.info("等待贴卡...", { description: "请将巡检标签靠近手机" });
+
+            ndef.onreading = (event: any) => {
+                const tagId = event.serialNumber;
+                setFormData(prev => ({ ...prev, nfcTagId: tagId }));
+                setIsScanning(false);
+                toast.success("标签绑定成功");
+
+                if ("vibrate" in navigator) {
+                    navigator.vibrate(200);
+                }
+            };
+
+            ndef.onreadingerror = () => {
+                toast.error("读取失败，请重试");
+                setIsScanning(false);
+            };
+
+        } catch (error) {
+            console.error("NFC Scan Error:", error);
+            setIsScanning(false);
+            toast.error("无法启动扫描");
+        }
     };
 
     const filteredCheckpoints = checkpoints.filter(cp => {

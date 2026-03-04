@@ -2,6 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const p = await params;
+    const route = await db.route.findUnique({
+      where: { id: p.id },
+      include: {
+        group: true,
+        role: true,
+        checkpoints: {
+          include: {
+            checkpoint: true
+          },
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return NextResponse.json({ error: 'Route not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(route);
+  } catch (error: unknown) {
+    return createErrorResponse(error, 'Failed to fetch route');
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

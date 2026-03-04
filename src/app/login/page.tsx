@@ -41,7 +41,8 @@ export default function LoginPage() {
                     id: data.user.id,
                     username: data.user.username,
                     name: data.user.name,
-                    role: data.user.role
+                    role: data.user.role,
+                    groupId: data.user.groupId
                 }));
 
                 router.push("/");

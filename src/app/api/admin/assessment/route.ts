@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
         const days = eachDayOfInterval({ start: startDate, end: endDate });
 
-        // 获取所有计划
+        // 获取所有计划（含已归档，确保历史考核数据不丢失）
         const plans = await db.plan.findMany({
             include: {
                 group: true,

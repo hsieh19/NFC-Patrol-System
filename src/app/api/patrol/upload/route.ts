@@ -42,21 +42,39 @@ export async function POST(req: NextRequest) {
       actualUserId = adminUser.id;
     }
 
-    // 3. Create the record with snapshots for history separation
-    const record = await db.patrolRecord.upsert({
-      where: { offlineId: id },
-      update: {},
-      create: {
-        checkpointId: checkpoint.id,
-        checkpointName: checkpoint.name, // 记录发生时的名称
-        checkpointLocation: checkpoint.location, // 记录发生时的物理位置
-        userId: actualUserId,
-        status: status || 'NORMAL',
-        notes: notes || '',
-        offlineId: id,
-        createdAt: new Date(timestamp),
-      },
-    });
+    // 3. Create OR Upsert the record
+    let record;
+    if (id) {
+      // If we have an offline ID, use upsert for idempotency
+      record = await db.patrolRecord.upsert({
+        where: { offlineId: id.toString() },
+        update: {},
+        create: {
+          checkpointId: checkpoint.id,
+          checkpointName: checkpoint.name,
+          checkpointLocation: checkpoint.location,
+          userId: actualUserId,
+          status: status || 'NORMAL',
+          notes: notes || '',
+          offlineId: id.toString(),
+          createdAt: new Date(timestamp),
+        },
+      });
+    } else {
+      // Real-time upload without offline ID
+      record = await db.patrolRecord.create({
+        data: {
+          checkpointId: checkpoint.id,
+          checkpointName: checkpoint.name,
+          checkpointLocation: checkpoint.location,
+          userId: actualUserId,
+          status: status || 'NORMAL',
+          notes: notes || '',
+          // offlineId remains null (means real-time)
+          createdAt: new Date(timestamp),
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, recordId: record.id });
   } catch (error: unknown) {

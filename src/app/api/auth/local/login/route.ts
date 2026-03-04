@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
         username: user.username,
         name: user.name,
         role: user.roleCode,
+        groupId: user.groupId,
       },
     });
   } catch (error: unknown) {

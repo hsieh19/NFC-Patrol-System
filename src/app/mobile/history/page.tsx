@@ -71,6 +71,11 @@ export default function HistoryPage() {
                 fetch("/api/admin/schedules"),
                 fetch("/api/admin/checkpoints")
             ]);
+
+            if (!planRes.ok || !cpRes.ok) {
+                throw new Error("基础数据加载失败");
+            }
+
             const allPlans: Plan[] = await planRes.json();
             const allCheckpoints: any[] = await cpRes.json();
 
@@ -83,8 +88,13 @@ export default function HistoryPage() {
             const nowStr = format(currentTime, "HH:mm");
             const activePlan = allPlans.find(plan => {
                 // 权限过滤：必须匹配当前用户的分组和角色
-                const matchesRole = plan.roleCode === userRoleCode;
-                const matchesGroup = !plan.groupId || plan.groupId === userGroupId; // 如果计划有分组限制，需匹配
+                const pRole = (plan.roleCode || "").trim().toUpperCase();
+                const uRole = (userRoleCode || "").trim().toUpperCase();
+                const pGroup = (plan.groupId || "").trim();
+                const uGroup = (userGroupId || "").trim();
+
+                const matchesRole = pRole === uRole;
+                const matchesGroup = !pGroup || pGroup === uGroup;
 
                 if (!matchesRole || !matchesGroup) return false;
 
@@ -102,12 +112,14 @@ export default function HistoryPage() {
             if (activePlan) {
                 // 如果找到计划，拉取该计划完整的路线详情
                 const routeRes = await fetch(`/api/admin/routes/${activePlan.route.id}`);
+                if (!routeRes.ok) throw new Error("获取路线详情失败");
                 const routeDetail = await routeRes.json();
                 activePlan.route = routeDetail;
                 setCurrentPlan(activePlan);
 
                 // 3. 获取打卡记录 (包括在线和本地离线)
                 const recordRes = await fetch("/api/admin/records");
+                if (!recordRes.ok) throw new Error("获取巡检记录失败");
                 const serverRecords: any[] = await recordRes.json();
 
                 const localRecords = await offlineDb.patrolRecords.toArray();
