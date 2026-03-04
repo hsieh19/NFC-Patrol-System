@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission, getAuthUser } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const p = await params;
-  return NextResponse.json({ message: "Dynamic route reachable", id: p.id });
+  try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
+    const p = await params;
+    return NextResponse.json({ message: "Dynamic route reachable", id: p.id });
+  } catch (error: unknown) {
+    return createErrorResponse(error, 'Get failed');
+  }
 }
 
 export async function PATCH(
@@ -15,11 +23,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const p = await params;
     const { nfcTagId, name, location, groupId, roleCode, creatorId } = await req.json();
     console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId, roleCode, creatorId });
 
-    const { getAuthUser } = await import('@/lib/auth');
     const creator = await getAuthUser(req);
 
     let targetGroupId = groupId;
@@ -59,6 +69,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const p = await params;
     console.log(`[API] Deleting checkpoint: ${p.id}`);
 

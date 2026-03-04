@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { username },
+      include: { role: true }
     });
 
     if (!user || !user.password) {
@@ -30,7 +31,14 @@ export async function POST(req: NextRequest) {
     const { signToken } = await import('@/lib/auth');
     const token = await signToken(tokenPayload);
 
-    return NextResponse.json({
+    let permissions = [];
+    try {
+      permissions = JSON.parse(user.role?.permissions || '[]');
+    } catch {
+      permissions = [];
+    }
+
+    const response = NextResponse.json({
       success: true,
       token,
       user: {
@@ -39,8 +47,18 @@ export async function POST(req: NextRequest) {
         name: user.name,
         role: user.roleCode,
         groupId: user.groupId,
+        permissions: permissions
       },
     });
+
+    response.cookies.set('token', token, {
+      path: '/',
+      maxAge: 86400, // 24 hours
+      sameSite: 'lax',
+      httpOnly: false, // set to false because we might need to access it on client side for now, though better to use httpOnly
+    });
+
+    return response;
   } catch (error: unknown) {
     return createErrorResponse(error, 'Internal Server Error');
   }

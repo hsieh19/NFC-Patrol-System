@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
           password: hashedPassword,
           name: '系统超级管理员',
           roleCode: 'SUPER_ADMIN',
-          department: '技术中心'
+          department: '无'
         }
       }),
       db.systemConfig.upsert({

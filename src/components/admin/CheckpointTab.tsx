@@ -54,9 +54,10 @@ export default function CheckpointTab() {
 
     const fetchCheckpoints = async () => {
         try {
-            const res = await fetch("/api/admin/checkpoints");
+            const res = await fetch(`/api/admin/checkpoints?_t=${Date.now()}`);
+            if (!res.ok) { setLoading(false); return; }
             const data = await res.json();
-            setCheckpoints(data);
+            if (Array.isArray(data)) setCheckpoints(data);
         } catch (error) {
             console.error("Failed to fetch checkpoints:", error);
         } finally {
@@ -66,9 +67,15 @@ export default function CheckpointTab() {
 
     const fetchGroups = async () => {
         try {
-            const res = await fetch("/api/admin/groups");
+            const res = await fetch(`/api/admin/groups?_t=${Date.now()}`);
+            if (!res.ok) return;
             const data = await res.json();
-            setGroups(data);
+            if (Array.isArray(data)) {
+                setGroups(data);
+                if (data.length === 1) {
+                    setNewData(prev => ({ ...prev, groupId: data[0].id }));
+                }
+            }
         } catch (error) {
             console.error("Failed to fetch groups:", error);
         }
@@ -76,12 +83,15 @@ export default function CheckpointTab() {
 
     const fetchRoles = async () => {
         try {
-            const res = await fetch("/api/admin/roles");
+            const res = await fetch(`/api/admin/roles?_t=${Date.now()}`);
+            if (!res.ok) return;
             const data = await res.json();
-            const filteredRoles = data.filter((role: Role) =>
-                role.code === "OPERATOR" || role.code === "SECURITY"
-            );
-            setRoles(filteredRoles);
+            if (Array.isArray(data)) {
+                const filteredRoles = data.filter((role: Role) =>
+                    role.code === "OPERATOR" || role.code === "SECURITY"
+                );
+                setRoles(filteredRoles);
+            }
         } catch (error) {
             console.error("Failed to fetch roles:", error);
         }
@@ -111,7 +121,7 @@ export default function CheckpointTab() {
                 body: JSON.stringify({ ...newData, creatorId: currentUser?.id }),
             });
             if (res.ok) {
-                setNewData({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "" });
+                setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "" });
                 setIsAdding(false);
                 fetchCheckpoints();
             } else {
@@ -313,7 +323,10 @@ export default function CheckpointTab() {
                         导入 / 导出
                     </button>
                     <button
-                        onClick={() => setIsAdding(true)}
+                        onClick={() => {
+                            setIsAdding(true);
+                            setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "" });
+                        }}
                         className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                     >
                         <Plus className="w-4 h-4" />
@@ -360,7 +373,7 @@ export default function CheckpointTab() {
                                 </td>
                                 <td className="py-3 px-4 text-right flex justify-end gap-2">
                                     <button onClick={handleAdd} className="p-1.5 text-green-600 hover:bg-green-100 rounded text-xs"><Check className="w-4 h-4" /></button>
-                                    <button onClick={() => setIsAdding(false)} className="p-1.5 text-red-600 hover:bg-red-100 rounded text-xs"><X className="w-4 h-4" /></button>
+                                    <button onClick={() => { setIsAdding(false); setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "" }); }} className="p-1.5 text-red-600 hover:bg-red-100 rounded text-xs"><X className="w-4 h-4" /></button>
                                 </td>
                             </tr>
                         )}

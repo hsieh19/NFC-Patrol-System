@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission, getAuthUser } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const hasAdminPerm = await checkPermission(req, 'ADMIN_CHECKPOINT');
+    const hasScanPerm = await checkPermission(req, 'APP_SCAN');
+
+    if (!hasAdminPerm && !hasScanPerm) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const p = await params;
     const route = await db.route.findUnique({
       where: { id: p.id },
@@ -26,6 +33,12 @@ export async function GET(
       return NextResponse.json({ error: 'Route not found' }, { status: 404 });
     }
 
+    const user = await getAuthUser(req);
+    // 强制组级隔离 (如果用户不是超级管理员，且该路线有分配组，且组并不匹配用户的组)
+    if (user?.roleCode !== 'SUPER_ADMIN' && route.groupId && route.groupId !== user?.groupId) {
+      return NextResponse.json({ error: '无权访问跨组路线数据' }, { status: 403 });
+    }
+
     return NextResponse.json(route);
   } catch (error: unknown) {
     return createErrorResponse(error, 'Failed to fetch route');
@@ -37,6 +50,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const p = await params;
     const { name, description, groupId, roleCode, checkpoints } = await req.json();
 
@@ -99,6 +115,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const p = await params;
 
     // Delete associated route checkpoints

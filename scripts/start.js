@@ -18,9 +18,15 @@ if (!fs.existsSync(migrationsPath)) {
 
 // 运行数据库迁移
 console.log('🧰 正在执行数据库迁移...');
+
+// 确保 DATABASE_URL 正确设置（Prisma CLI 相对于 prisma/ 目录解析路径）
+if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = 'file:./dev.db';
+}
+
 try {
     // 尝试运行迁移
-    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+    execSync('npx prisma migrate deploy', { stdio: 'inherit', env: process.env });
     console.log('✅ 数据库迁移成功');
 } catch (error) {
     console.log('⚠️  迁移部署失败，尝试创建初始迁移...');

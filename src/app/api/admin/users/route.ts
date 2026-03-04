@@ -2,13 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission, getAuthUser } from '@/lib/auth';
 
 /**
  * Get all users for admin dashboard
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_USER_MANAGE'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
+    const currentUser = await getAuthUser(req);
+    let whereClause: any = {};
+
+    if (currentUser?.roleCode === 'ADMIN') {
+      whereClause = {
+        groupId: currentUser.groupId,
+        roleCode: { not: 'SUPER_ADMIN' }
+      };
+    } else if (currentUser?.roleCode !== 'SUPER_ADMIN') {
+      whereClause = {
+        id: currentUser?.id // fallback if somehow they get here
+      };
+    }
+
     const users = await db.user.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: { group: true, role: true }
     });
@@ -27,6 +46,9 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_USER_MANAGE'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const { username, name, roleCode, department, groupId, creatorId } = await req.json();
 
     if (!name) {
@@ -36,19 +58,19 @@ export async function POST(req: NextRequest) {
     let targetGroupId = groupId || null;
     const targetRoleCode = roleCode || 'OPERATOR';
 
-    // Role-based logic
-    const { getAuthUser } = await import('@/lib/auth');
+    // Role-based restrictive logic
     const creator = await getAuthUser(req);
 
     if (creator) {
       if (creator.roleCode === 'ADMIN') {
-        const allowedRoles = ['ADMIN', 'OPERATOR', 'SECURITY'];
+        const allowedRoles = ['OPERATOR', 'SECURITY'];
         if (!allowedRoles.includes(targetRoleCode)) {
           return NextResponse.json({ error: '管理员无权分配此角色' }, { status: 403 });
         }
         // Same group as creator
         targetGroupId = creator.groupId;
       } else if (creator.roleCode !== 'SUPER_ADMIN') {
+        // This case would likely be caught by checkPermission above, but keeping for safety.
         return NextResponse.json({ error: '无权新建人员' }, { status: 403 });
       }
     }

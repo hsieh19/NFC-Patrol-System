@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission } from '@/lib/auth';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
     try {
+        if (!(await checkPermission(req, 'ADMIN_GROUP_MANAGE'))) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
         const { id } = await params;
         const { name, description } = await req.json();
 
@@ -31,6 +35,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
     try {
+        if (!(await checkPermission(req, 'ADMIN_GROUP_MANAGE'))) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
         const { id } = await params;
 
         await db.userGroup.delete({

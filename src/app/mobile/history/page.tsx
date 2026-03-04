@@ -73,7 +73,13 @@ export default function HistoryPage() {
             ]);
 
             if (!planRes.ok || !cpRes.ok) {
-                throw new Error("基础数据加载失败");
+                const planErr = !planRes.ok ? await planRes.text().catch(() => "Unknown") : "OK";
+                const cpErr = !cpRes.ok ? await cpRes.text().catch(() => "Unknown") : "OK";
+                console.error("Data fetch failed:", {
+                    schedules: { ok: planRes.ok, status: planRes.status, body: planErr },
+                    checkpoints: { ok: cpRes.ok, status: cpRes.status, body: cpErr }
+                });
+                throw new Error(`基础数据加载失败: Schedules(${planRes.status}), Checkpoints(${cpRes.status}). Msg: ${planErr}/${cpErr}`);
             }
 
             const allPlans: Plan[] = await planRes.json();

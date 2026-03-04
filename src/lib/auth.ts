@@ -52,24 +52,47 @@ export async function getAuthUser(req: NextRequest) {
     const tokenCookie = req.cookies.get('token')?.value;
 
     if (!tokenCookie) {
+        console.log(`[Auth] No token cookie found`);
         return null;
     }
 
     const payload = await verifyToken(tokenCookie);
 
     if (!payload || !payload.id) {
+        console.log(`[Auth] Token verification failed or ID missing: ${!!payload}`);
         return null;
     }
 
     try {
-        // Fetch fresh user data from database to ensure they haven't been deleted or roles changed
         const user = await db.user.findUnique({
             where: { id: payload.id },
             include: { role: true }
         });
-
+        if (!user) console.log(`[Auth] User with ID ${payload.id} not found in DB`);
         return user;
-    } catch {
+    } catch (e) {
+        console.error(`[Auth] DB Fetch Error:`, e);
         return null;
+    }
+}
+
+/**
+ * Check if the authenticated user has a specific permission
+ */
+export async function checkPermission(req: NextRequest, permission: string): Promise<boolean> {
+    const user = await getAuthUser(req);
+    if (!user || !user.role) {
+        console.log(`[Permission Check] User not found or role missing for: ${permission}`);
+        return false;
+    }
+
+    try {
+        const permissions = JSON.parse(user.role.permissions || '[]') as string[];
+        const hasPerm = permissions.includes('ALL') || permissions.includes(permission);
+        console.log(`[Permission Check] User: ${user.username}, Role: ${user.roleCode}, Check: ${permission}, Result: ${hasPerm}`);
+        return hasPerm;
+    } catch (e) {
+        console.error(`[Permission Check] Parse error for user ${user.username}:`, e);
+        return false;
     }
 }

@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 import { SYSTEM_CONSTANTS } from '@/lib/constants';
+import { checkPermission, getAuthUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const canManageRoles = await checkPermission(req, 'ADMIN_ROLE_MANAGE');
+        const user = await getAuthUser(req);
+
+        let whereClause = {};
+        if (!canManageRoles && user?.roleCode === 'ADMIN') {
+            whereClause = { code: { in: ['OPERATOR', 'SECURITY'] } };
+        }
+
         let roles = await db.role.findMany({
+            where: whereClause,
             orderBy: { createdAt: 'desc' },
             include: {
                 _count: {
@@ -15,7 +25,8 @@ export async function GET() {
         });
 
         // Auto-seed system roles if not present
-        if (roles.length === 0) {
+        // Auto-seed system roles if not present (only if no whereClause is applied)
+        if (roles.length === 0 && Object.keys(whereClause).length === 0) {
             await db.role.createMany({
                 data: SYSTEM_CONSTANTS.INITIAL_ROLES.map(role => ({
                     code: role.code,
@@ -26,6 +37,7 @@ export async function GET() {
                 }))
             });
             roles = await db.role.findMany({
+                where: whereClause,
                 orderBy: { createdAt: 'desc' },
                 include: {
                     _count: { select: { users: true } }
@@ -41,6 +53,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
     try {
+        if (!(await checkPermission(req, 'ADMIN_ROLE_MANAGE'))) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
         const { code, name, description, permissions } = await req.json();
 
         if (!code || !name) {

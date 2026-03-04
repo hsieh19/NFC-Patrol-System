@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 import { addDays, parse, format, differenceInCalendarDays, eachDayOfInterval } from 'date-fns';
+import { checkPermission } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
     try {
+        if (!(await checkPermission(req, 'ADMIN_SCHEDULE'))) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
         const { searchParams } = new URL(req.url);
 
         const dateParam = searchParams.get('date');

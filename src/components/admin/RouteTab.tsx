@@ -75,7 +75,7 @@ export default function RouteTab() {
 
     const fetchRoutes = async () => {
         try {
-            const res = await fetch("/api/admin/routes");
+            const res = await fetch(`/api/admin/routes?_t=${Date.now()}`);
             const data = await res.json();
             setRoutes(Array.isArray(data) ? data : []);
         } catch (error) {
@@ -86,10 +86,13 @@ export default function RouteTab() {
 
     const fetchCheckpoints = async () => {
         try {
-            const res = await fetch("/api/admin/checkpoints");
+            const res = await fetch(`/api/admin/checkpoints?_t=${Date.now()}`);
+            if (!res.ok) return;
             const data = await res.json();
-            setCheckpoints(data);
-            setAvailableCheckpoints(data);
+            if (Array.isArray(data)) {
+                setCheckpoints(data);
+                setAvailableCheckpoints(data);
+            }
         } catch (error) {
             console.error("Failed to fetch checkpoints:", error);
         }
@@ -97,9 +100,15 @@ export default function RouteTab() {
 
     const fetchGroups = async () => {
         try {
-            const res = await fetch("/api/admin/groups");
+            const res = await fetch(`/api/admin/groups?_t=${Date.now()}`);
+            if (!res.ok) return;
             const data = await res.json();
-            setGroups(data);
+            if (Array.isArray(data)) {
+                setGroups(data);
+                if (data.length === 1) {
+                    setRouteForm(prev => ({ ...prev, groupId: data[0].id }));
+                }
+            }
         } catch (error) {
             console.error("Failed to fetch groups:", error);
         }
@@ -107,13 +116,15 @@ export default function RouteTab() {
 
     const fetchRoles = async () => {
         try {
-            const res = await fetch("/api/admin/roles");
+            const res = await fetch(`/api/admin/roles?_t=${Date.now()}`);
+            if (!res.ok) return;
             const data = await res.json();
-            // 只获取运维人员和保安人员角色
-            const filteredRoles = data.filter((role: Role) =>
-                role.code === "OPERATOR" || role.code === "SECURITY"
-            );
-            setRoles(filteredRoles);
+            if (Array.isArray(data)) {
+                const filteredRoles = data.filter((role: Role) =>
+                    role.code === "OPERATOR" || role.code === "SECURITY"
+                );
+                setRoles(filteredRoles);
+            }
         } catch (error) {
             console.error("Failed to fetch roles:", error);
         }
@@ -231,7 +242,7 @@ export default function RouteTab() {
     };
 
     const resetForm = () => {
-        setRouteForm({ name: "", description: "", groupId: "", roleCode: "" });
+        setRouteForm({ name: "", description: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "" });
         setRouteCheckpoints([]);
         setAvailableCheckpoints(checkpoints);
     };

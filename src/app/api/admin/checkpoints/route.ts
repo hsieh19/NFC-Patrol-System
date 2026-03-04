@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission, getAuthUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const hasAdminPerm = await checkPermission(req, 'ADMIN_CHECKPOINT');
+    const hasScanPerm = await checkPermission(req, 'APP_SCAN');
+
+    if (!hasAdminPerm && !hasScanPerm) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
+    const user = await getAuthUser(req);
+    let whereClause = {};
+    if (user?.roleCode !== 'SUPER_ADMIN') {
+      const gid = user?.groupId || null;
+      whereClause = {
+        OR: [
+          { groupId: gid },
+          { groupId: null }
+        ]
+      };
+    }
+
     const checkpoints = await db.checkpoint.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: { group: true, role: true }
     });
@@ -16,6 +36,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const body = await req.json();
     const { name, nfcTagId, location, groupId, roleCode, creatorId } = body;
 
@@ -23,7 +46,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name, NFC Tag ID, Group ID and Role Code are required' }, { status: 400 });
     }
 
-    const { getAuthUser } = await import('@/lib/auth');
     const creator = await getAuthUser(req);
 
     let targetGroupId = groupId;

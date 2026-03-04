@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission, getAuthUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
+    const user = await getAuthUser(req);
+    let whereClause = {};
+    if (user?.roleCode === 'ADMIN') {
+      whereClause = { groupId: user.groupId };
+    }
+
     const routes = await db.route.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: {
         group: true,
@@ -25,6 +36,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const body = await req.json();
     const { name, description, groupId, roleCode, checkpoints } = body;
 

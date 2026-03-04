@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission } from '@/lib/auth';
 
 /**
  * GET /api/admin/checkpoints/export?groupId=xxx&roleCode=xxx
@@ -8,6 +9,9 @@ import { createErrorResponse } from '@/lib/api-error';
  */
 export async function GET(req: NextRequest) {
     try {
+        if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
         const { searchParams } = new URL(req.url);
         const groupId = searchParams.get('groupId');
         const roleCode = searchParams.get('roleCode');
@@ -52,6 +56,9 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
     try {
+        if (!(await checkPermission(req, 'ADMIN_CHECKPOINT'))) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
         const body = await req.json();
         const { groupId, roleCode, rows } = body;
 

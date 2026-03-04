@@ -13,6 +13,18 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
+    // 检查系统是否初始化，未初始化则跳转
+    React.useEffect(() => {
+        fetch("/api/auth/init/status")
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.isInitialised === false) {
+                    router.push("/init");
+                }
+            })
+            .catch(err => console.error("Failed to check init status", err));
+    }, [router]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
@@ -33,8 +45,20 @@ export default function LoginPage() {
             const data = await res.json();
 
             if (res.ok && data.success) {
-                // 写入真实 JWT 用于中间件拦截验证
-                document.cookie = `token=${data.token}; path=/; max-age=86400`;
+                // 仅检测电脑端：非管理员角色不能登录后台
+                const isMobile = Boolean(
+                    navigator.userAgent.match(
+                        /Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i
+                    )
+                );
+
+                if (!isMobile && data.user.role !== 'SUPER_ADMIN' && data.user.role !== 'ADMIN') {
+                    setError("该角色仅限于手机端打卡使用，无权访问电脑管理后台！");
+                    setLoading(false);
+                    return;
+                }
+
+                // Token is now set via Set-Cookie header from the API
 
                 // 存储用户信息供前端调用
                 localStorage.setItem("user", JSON.stringify({

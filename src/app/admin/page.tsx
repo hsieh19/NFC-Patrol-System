@@ -12,8 +12,12 @@ import UserTab from "@/components/admin/UserTab";
 import AssessmentTab from "@/components/admin/AssessmentTab";
 import pkg from "../../../package.json";
 
+import { usePermissions } from "@/hooks/use-permissions";
+import { PermissionKey } from "@/lib/permissions";
+
 export default function AdminDashboard() {
     const router = useRouter();
+    const { hasPermission, loading: permissionLoading } = usePermissions();
     const [activeTab, setActiveTab] = useState("monitor");
     const [currentTime, setCurrentTime] = useState<string>("");
     const [currentUser, setCurrentUser] = useState<{ id: string, username?: string, name: string, roleCode: string } | null>(null);
@@ -24,6 +28,25 @@ export default function AdminDashboard() {
     const [passwordLoading, setPasswordLoading] = useState(false);
 
     const accountRef = useRef<HTMLDivElement>(null);
+
+    // Sidebar menu items with permission mapping
+    const menuItems = [
+        { id: "monitor", icon: <Clock className="w-5 h-5" />, label: "实时监控", permission: "ADMIN_MONITOR" as PermissionKey },
+        { id: "config", icon: <MapPin className="w-5 h-5" />, label: "巡检点配置", permission: "ADMIN_CHECKPOINT" as PermissionKey },
+        { id: "route", icon: <Route className="w-5 h-5" />, label: "路线配置", permission: "ADMIN_CHECKPOINT" as PermissionKey },
+        { id: "plan", icon: <Calendar className="w-5 h-5" />, label: "计划配置", permission: "ADMIN_SCHEDULE" as PermissionKey },
+        { id: "assessment", icon: <Calendar className="w-5 h-5" />, label: "计划考核", permission: "ADMIN_SCHEDULE" as PermissionKey },
+        { id: "users", icon: <Users className="w-5 h-5" />, label: "权限管理", permission: ["ADMIN_USER_MANAGE", "ADMIN_ROLE_MANAGE", "ADMIN_GROUP_MANAGE"] as PermissionKey[] },
+    ];
+
+    // Filter menu items based on permissions
+    const visibleMenuItems = menuItems.filter(item => {
+        if (permissionLoading) return true; // Show all while loading to prevent flickering, or hide all? Better hide if we want strictness.
+        if (Array.isArray(item.permission)) {
+            return item.permission.some(p => hasPermission(p));
+        }
+        return hasPermission(item.permission);
+    });
 
     // 点击外部隐藏菜单
     useEffect(() => {
@@ -124,14 +147,15 @@ export default function AdminDashboard() {
         }
     };
 
-    const menuItems = [
-        { id: "monitor", icon: <Clock className="w-5 h-5" />, label: "实时监控" },
-        { id: "config", icon: <MapPin className="w-5 h-5" />, label: "巡检点配置" },
-        { id: "route", icon: <Route className="w-5 h-5" />, label: "路线配置" },
-        { id: "plan", icon: <Calendar className="w-5 h-5" />, label: "计划配置" },
-        { id: "assessment", icon: <Calendar className="w-5 h-5" />, label: "计划考核" },
-        { id: "users", icon: <Users className="w-5 h-5" />, label: "权限管理" },
-    ];
+    // Handle tab availability after permission check
+    useEffect(() => {
+        if (!permissionLoading && visibleMenuItems.length > 0) {
+            const isCurrentTabVisible = visibleMenuItems.some(item => item.id === activeTab);
+            if (!isCurrentTabVisible) {
+                setActiveTab(visibleMenuItems[0].id);
+            }
+        }
+    }, [permissionLoading, visibleMenuItems, activeTab]);
 
     return (
         <div className="flex h-screen bg-[#F8FAFC] text-gray-900 font-sans overflow-hidden">
@@ -154,7 +178,7 @@ export default function AdminDashboard() {
 
                     {/* 菜单部分 */}
                     <div className="px-3 space-y-1">
-                        {menuItems.map((item) => (
+                        {visibleMenuItems.map((item) => (
                             <div
                                 key={item.id}
                                 onClick={() => setActiveTab(item.id)}

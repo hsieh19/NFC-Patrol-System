@@ -8,138 +8,138 @@ datasource db {
 }
 
 model Role {
-  code        String   @id // 'ADMIN', 'OPERATOR', or custom id
+  code        String       @id
   name        String
-  permissions String   @default("[]") // JSON array of permission strings
+  permissions String       @default("[]")
   description String?
-  isSystem    Boolean  @default(false)
-  users       User[]
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   checkpoints Checkpoint[]
-  routes      Route[]
   plans       Plan[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  routes      Route[]
+  users       User[]
 }
 
 model User {
-  id           String   @id @default(cuid())
-  username     String?  @unique // For local user/admin login
-  password     String?  // Hashed password
-  name         String
-  avatar       String?
-  department   String?  
-  roleCode     String   @default("OPERATOR")
-  role         Role?    @relation(fields: [roleCode], references: [code], onDelete: SetDefault)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  groupId      String?
-  group        UserGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  patrols      PatrolRecord[]
-  repairs      RepairReport[]
+  id         String         @id @default(cuid())
+  username   String?        @unique
+  password   String?
+  name       String
+  avatar     String?
+  department String?
+  roleCode   String         @default("OPERATOR")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  groupId    String?
+  patrols    PatrolRecord[]
+  repairs    RepairReport[]
+  group      UserGroup?     @relation(fields: [groupId], references: [id])
+  role       Role           @relation(fields: [roleCode], references: [code], onDelete: SetDefault)
 }
 
 model UserGroup {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String       @id @default(cuid())
+  name        String       @unique
   description String?
-  users       User[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   checkpoints Checkpoint[]
-  routes      Route[]
   plans       Plan[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  routes      Route[]
+  users       User[]
 }
 
 model SystemConfig {
-  id        Int      @id @default(1)
-  isInitialised Boolean @default(false)
-  updatedAt DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  isInitialised Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
 }
 
 model Checkpoint {
-  id        String   @id @default(cuid())
-  nfcTagId  String   @unique
-  name      String
-  location  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  records   PatrolRecord[]
-  repairs   RepairReport[]
+  id         String            @id @default(cuid())
+  nfcTagId   String            @unique
+  name       String
+  location   String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  groupId    String
+  roleCode   String
+  role       Role              @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  group      UserGroup         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  records    PatrolRecord[]
+  repairs    RepairReport[]
   routeLinks RouteCheckpoint[]
-  groupId   String
-  group     UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  roleCode  String
-  role      Role @relation(fields: [roleCode], references: [code], onDelete: Cascade)
 }
 
 model Route {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String            @id @default(cuid())
+  name        String            @unique
   description String?
-  checkpoints RouteCheckpoint[]
-  plans       Plan[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   groupId     String
-  group       UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   roleCode    String
-  role        Role @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  plans       Plan[]
+  role        Role              @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  group       UserGroup         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  checkpoints RouteCheckpoint[]
 }
 
 model RouteCheckpoint {
   id           String     @id @default(cuid())
   routeId      String
-  route        Route      @relation(fields: [routeId], references: [id], onDelete: Cascade)
   checkpointId String
-  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
   order        Int        @default(0)
-  
+  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  route        Route      @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
   @@unique([routeId, checkpointId])
 }
 
 model Plan {
-  id           String      @id @default(cuid())
-  name         String      // 计划名称
-  routeId      String
-  route        Route       @relation(fields: [routeId], references: [id])
-  startTime    String      
-  endTime      String      
-  assignedTo   String?     // 可指定具体用户ID或角色编码
-  frequency    String      @default("DAILY") 
-  planType     String      @default("ORDERED") // ORDERED 有序计划, UNORDERED 无序计划
-  groupId      String
-  group        UserGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  roleCode     String
-  role         Role        @relation(fields: [roleCode], references: [code], onDelete: Cascade)
-  isArchived   Boolean     @default(false) // 软删除标记，删除时不会真正从数据库移除
-  archivedAt   DateTime?   // 归档时间
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id         String    @id @default(cuid())
+  name       String
+  routeId    String
+  startTime  String
+  endTime    String
+  assignedTo String?
+  frequency  String    @default("DAILY")
+  planType   String    @default("ORDERED")
+  groupId    String
+  roleCode   String
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  role       Role      @relation(fields: [roleCode], references: [code], onDelete: Cascade)
+  group      UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  route      Route     @relation(fields: [routeId], references: [id])
 }
 
 model PatrolRecord {
   id                 String      @id @default(cuid())
   checkpointId       String?
-  checkpoint         Checkpoint? @relation(fields: [checkpointId], references: [id], onDelete: SetNull)
-  checkpointName     String?     // 冗余字段：保存发生时的巡检点名称
-  checkpointLocation String?     // 冗余字段：保存发生时的物理位置
+  checkpointName     String?
+  checkpointLocation String?
   userId             String
-  user               User        @relation(fields: [userId], references: [id])
   status             String      @default("NORMAL")
-  notes              String?     
-  offlineId          String?     @unique 
+  notes              String?
+  offlineId          String?     @unique
   createdAt          DateTime    @default(now())
+  user               User        @relation(fields: [userId], references: [id])
+  checkpoint         Checkpoint? @relation(fields: [checkpointId], references: [id])
 }
 
 model RepairReport {
   id           String      @id @default(cuid())
   checkpointId String?
-  checkpoint   Checkpoint? @relation(fields: [checkpointId], references: [id])
   userId       String
-  user         User        @relation(fields: [userId], references: [id])
-  description  String      
-  imageUrls    String?     
-  status       String      @default("PENDING") 
+  description  String
+  imageUrls    String?
+  status       String      @default("PENDING")
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+  user         User        @relation(fields: [userId], references: [id])
+  checkpoint   Checkpoint? @relation(fields: [checkpointId], references: [id])
 }

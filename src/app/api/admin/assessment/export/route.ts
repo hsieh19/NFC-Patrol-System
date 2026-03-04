@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 import { parse, format, addDays, eachDayOfInterval, differenceInCalendarDays } from 'date-fns';
+import { checkPermission } from '@/lib/auth';
 
 /**
  * GET /api/admin/assessment/export
@@ -10,6 +11,9 @@ import { parse, format, addDays, eachDayOfInterval, differenceInCalendarDays } f
  */
 export async function GET(req: NextRequest) {
     try {
+        if (!(await checkPermission(req, 'ADMIN_SCHEDULE'))) {
+            return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+        }
         const { searchParams } = new URL(req.url);
         const startDateStr = searchParams.get('startDate') || format(new Date(), 'yyyy-MM-dd');
         const endDateStr = searchParams.get('endDate') || startDateStr;

@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { checkPermission } from '@/lib/auth';
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_SCHEDULE'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const p = await params;
     const body = await req.json();
 
@@ -49,6 +53,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!(await checkPermission(req, 'ADMIN_SCHEDULE'))) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
     const p = await params;
     const { searchParams } = new URL(req.url);
     const isPermanent = searchParams.get('permanent') === 'true';
