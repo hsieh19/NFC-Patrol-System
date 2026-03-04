@@ -8,8 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "npx prisma migrate dev",
-    "db:generate": "npx prisma generate",
+    "db:push": "node scripts/prisma.js db push",
+    "db:migrate": "node scripts/prisma.js migrate dev",
+    "db:generate": "node scripts/prisma.js generate",
+    "db:studio": "node scripts/prisma.js studio",
     "test": "vitest run"
   },
   "dependencies": {
