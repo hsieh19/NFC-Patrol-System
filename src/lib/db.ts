@@ -36,3 +36,6 @@ export const db =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+
+// 启动后台自动归档调度器
+import('./cron-archive').then(m => m.initAutoArchive()).catch(console.error);

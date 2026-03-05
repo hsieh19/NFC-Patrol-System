@@ -70,3 +70,20 @@ export async function runAutoArchive() {
         isArchiving = false;
     }
 }
+
+// 自动启动调度器：每小时检查一次是否需要执行归档
+let schedulerStarted = false;
+export function initAutoArchive() {
+    if (schedulerStarted) return;
+    schedulerStarted = true;
+    
+    console.log('[AutoArchive] Background scheduler initialized.');
+    
+    // 立即执行一次检查
+    runAutoArchive().catch(console.error);
+    
+    // 设置每小时检查一次 (3600000ms)
+    setInterval(() => {
+        runAutoArchive().catch(console.error);
+    }, 3600 * 1000);
+}
