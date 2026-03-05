@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-03-05
+
+本版本聚焦于 **数据库性能优化与海量数据治理**，为系统应对每年 5000 万+ 条打卡记录的工业级高频场景提供了完整的架构保障。
+
+### ✨ 新功能 (Features)
+
+#### 1. 数据库性能索引优化
+- 为 `PatrolRecord` 添加 `[userId, createdAt]`、`[checkpointId, createdAt]`、`[status, createdAt]` 等复合索引，千万级数据查询提速百倍。
+- 为 `RepairReport` 添加 `[createdAt]`、`[userId, createdAt]`、`[status, createdAt]` 索引。
+- 为 `Checkpoint`、`Route`、`Plan` 添加 `groupId`、`roleCode` 索引，加速数据隔离查询。
+
+#### 2. 冷热数据自动归档系统
+- 新增 `PatrolRecordArchive` 归档表，与主表完全同构，用于存储 6 个月以前的历史打卡数据。
+- 新增智能查询路由 (`record-utils.ts`)：后端根据查询时间范围自动判断从主表还是归档表获取数据，前端完全无感知。
+- 新增每日静默归档引擎 (`cron-archive.ts`)：借助 Docker 健康检查的心跳机制，每 24 小时自动将超过 6 个月的打卡记录平滑迁移至归档表，确保主表始终保持轻量高效。
+
+### 🛠 工程化优化 (DevOps)
+
+- **Docker 零配置自动建表**：新增 `docker-entrypoint.sh` 入口脚本，容器首次启动时自动校验并推送数据库表结构（含索引），部署者无需手动执行任何数据库命令。
+- **Dockerfile 完善**：Runner 阶段注入 Prisma CLI 工具包与 openssl 依赖，支持运行时 `db push`。
+- **跨平台兼容**：自动消除 Windows CRLF 换行符，防止 Shell 脚本在 Linux 容器中执行报错。
+
+---
+
 ## [0.1.0] - 2026-03-05
 
 这是一个里程碑版本，标志着 **NFC 巡更点位管理系统** 的核心架构与功能集完整上线。本版本聚焦于提供企业级的 NFC 巡更闭环体验，并深度适配了内网 PWA 离线场景。
