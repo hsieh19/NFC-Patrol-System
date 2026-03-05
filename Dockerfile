@@ -56,6 +56,10 @@ USER nextjs
 EXPOSE 3000
 ENV PORT 3000
 
+# 健康检查：确保容器内部服务可用
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
+  CMD wget -q --spider http://127.0.0.1:3000/api/health || exit 1
+
 # 让入口脚本接管启动生命周期，执行完建表后再启动 server.js
 ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

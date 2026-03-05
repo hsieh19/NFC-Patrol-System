@@ -3,7 +3,7 @@ version: '3.8'
 services:
   nfc-app:
     # 建议生产环境直接拉取 GitHub 构建好的镜像
-    # image: ghcr.io/${GITHUB_REPOSITORY}:latest
+    image: ghcr.io/hsieh19/nfc-patrol-system:0.2.0
     build:
       context: .
       args:
@@ -19,7 +19,8 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
