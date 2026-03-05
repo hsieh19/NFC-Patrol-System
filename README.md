@@ -114,40 +114,20 @@ npm run start
 
 ### 2. 多数据库选型部署
 
-#### 方案 A：连接外部 MySQL (推荐)
-使用 `docker-compose.yml` 快速部署。
-```yaml
-version: '3.8'
-services:
-  nfc-app:
-    image: ghcr.io/${YOUR_ID}/nfc-patrol-system:latest
-    container_name: nfc-patrol
-    restart: always
-    environment:
-      - DATABASE_URL=mysql://user:pass@192.168.1.10:3306/nfc_db
-      - JWT_SECRET=your-32-char-secret
-      - NEXT_PUBLIC_BASE_URL=https://patrol.your-domain.com
-    ports:
-      - "3000:3000"
-```
+本项目已预置 `docker-compose.yml` 配置文件。您可以直接下载并根据需要修改。
 
-#### 方案 B：使用本地 SQLite
-适用于低功耗边缘网关或简易内网环境。
-```yaml
-version: '3.8'
-services:
-  nfc-app:
-    image: ghcr.io/${YOUR_ID}/nfc-patrol-system:latest-sqlite
-    container_name: nfc-patrol-lite
-    restart: always
-    volumes:
-      - ./data:/app/data
-    environment:
-      - DATABASE_URL=file:/app/data/dev.db
-      - JWT_SECRET=your-secret
-      - NEXT_PUBLIC_BASE_URL=https://patrol.your-domain.com
-    ports:
-      - "3000:3000"
+#### 部署执行：
+1. **下载项目文件**，确保 `docker-compose.yml` 位于部署目录下。
+2. **选择镜像版本**：
+   - **MySQL 版**：使用默认 `image: ghcr.io/${YOUR_ID}/nfc-patrol-system:latest`。
+   - **SQLite 版**：将镜像改为 `...:latest-sqlite`，并挂载数据卷 `./data:/app/data`。
+3. **关键参数配置**：修改 `environment` 部分：
+   - `DATABASE_URL`: 数据库连接字符串。
+   - `JWT_SECRET`: 务必修改为随机的长字符串。
+   - `NEXT_PUBLIC_BASE_URL`: 必须填写内网 Nginx 暴露的完整 **HTTPS** 地址。
+4. **启动容器**：
+```bash
+docker-compose up -d
 ```
 
 ---
@@ -155,28 +135,8 @@ services:
 ## 🔐 内网生产环境关键配置 (必读)
 
 ### 1. Nginx 反向代理 (SSL 卸载)
-**核心要求**：由于 PWA 离线功能与 Web NFC 扫码必须在 **Secure Context (HTTPS)** 下运行，内网部署必须通过 Nginx 等代理层提供 HTTPS。
+**核心要求**：由于 PWA 离线功能与 Web NFC 扫码必须在 **Secure Context (HTTPS)** 下运行，内网部署必须通过 Nginx 等代理层提供 HTTPS。您可参考项目文档中的 Nginx 配置模版。
 
-**Nginx 配置示例：**
-```nginx
-server {
-    listen 443 ssl;
-    server_name patrol.internal.com; # 您的内网 IP 或域名
-
-    ssl_certificate /etc/nginx/certs/fullchain.pem;
-    ssl_certificate_key /etc/nginx/certs/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000; # 转发到容器映射端口
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme; # 确保 App 识别 HTTPS 环境
-    }
-}
-```
 
 ### 2. 注意事项
 - **PWA 域名匹配**：`.env` 中的 `NEXT_PUBLIC_BASE_URL` 必须与用户实际访问的地址（含 `https://`）完全一致，否则 Service Worker 无法离线。
