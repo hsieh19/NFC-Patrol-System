@@ -105,52 +105,86 @@ npm run start
 
 ## 🏗 生产环境部署 (Docker)
 
-推荐使用 Docker 进行容器化部署，本项目已内置多阶段构建优化的 `Dockerfile`。
+本项目推荐使用 Docker 容器化部署。已内置 **Standalone** 模式优化，镜像体积极小且性能高效。
 
-### 1. 自动构建
-每当向 GitHub 推送以 `v` 开头的标签（如 `v1.0.0`）时，GitHub Actions 会自动构建镜像并推送到 **GitHub Container Registry (GHCR)**。
+### 1. 镜像获取
+本项目通过 GitHub Actions 自动构建并推送到 GHCR。每种版本提供两个变体：
+- `latest`: 核心镜像，适用于 **MySQL** 外部数据库。
+- `latest-sqlite`: 预置 SQLite 引擎的镜像，适用于单机部署。
 
-### 2. 手动构建与运行
-```bash
-# 构建镜像
-docker build -t nfc-patrol-system .
+### 2. 多数据库选型部署
 
-# 运行容器 (使用外部配置文件)
-docker run -d \
-  --name nfc-system \
-  -p 3000:3000 \
-  --env-file .env \
-  nfc-patrol-system
-```
-
-### 3. Docker Compose 示例
+#### 方案 A：连接外部 MySQL (推荐)
+使用 `docker-compose.yml` 快速部署。
 ```yaml
+version: '3.8'
 services:
-  app:
-    image: ghcr.io/${YOUR_GITHUB_ID}/nfc-patrol-system:latest
+  nfc-app:
+    image: ghcr.io/${YOUR_ID}/nfc-patrol-system:latest
+    container_name: nfc-patrol
+    restart: always
+    environment:
+      - DATABASE_URL=mysql://user:pass@192.168.1.10:3306/nfc_db
+      - JWT_SECRET=your-32-char-secret
+      - NEXT_PUBLIC_BASE_URL=https://patrol.your-domain.com
     ports:
       - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      - DB_TYPE=mysql # 强制使用外部 MySQL
+```
+
+#### 方案 B：使用本地 SQLite
+适用于低功耗边缘网关或简易内网环境。
+```yaml
+version: '3.8'
+services:
+  nfc-app:
+    image: ghcr.io/${YOUR_ID}/nfc-patrol-system:latest-sqlite
+    container_name: nfc-patrol-lite
     restart: always
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=file:/app/data/dev.db
+      - JWT_SECRET=your-secret
+      - NEXT_PUBLIC_BASE_URL=https://patrol.your-domain.com
+    ports:
+      - "3000:3000"
 ```
 
 ---
 
-## 🔐 生产环境关键注意事项
+## 🔐 内网生产环境关键配置 (必读)
 
-### 1. 必须启用 HTTPS
-**核心提醒**：由于 Web NFC API 的安全限制，系统必须在 **HTTPS** 环境下运行，否则移动端无法调用感应功能。建议在 Docker 前层挂载 **Nginx** 进行 SSL 卸载。
+### 1. Nginx 反向代理 (SSL 卸载)
+**核心要求**：由于 PWA 离线功能与 Web NFC 扫码必须在 **Secure Context (HTTPS)** 下运行，内网部署必须通过 Nginx 等代理层提供 HTTPS。
 
-### 2. JWT 安全
-生产环境务必在 `.env` 中修改 `JWT_SECRET` 为至少 32 位的随机字符串。
+**Nginx 配置示例：**
+```nginx
+server {
+    listen 443 ssl;
+    server_name patrol.internal.com; # 您的内网 IP 或域名
 
-### 3. 数据库库选型
-生产环境强烈建议将 `DB_TYPE` 设为 `mysql`，并连接独立的 MySQL 8.0 数据库以获得更好的并发性能。
+    ssl_certificate /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000; # 转发到容器映射端口
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme; # 确保 App 识别 HTTPS 环境
+    }
+}
+```
+
+### 2. 注意事项
+- **PWA 域名匹配**：`.env` 中的 `NEXT_PUBLIC_BASE_URL` 必须与用户实际访问的地址（含 `https://`）完全一致，否则 Service Worker 无法离线。
+- **健康检查**：容器内置了健康检查接口 `/api/health`，可通过 `docker ps` 查看容器运行状态。
+- **证书信任**：内网自签名证书需分发至巡更员手机端安装并信任，否则 PWA 无法实现“断网离线打开”。
 
 ---
 
 ## 📄 许可证
 本项目遵循 MIT 协议。
+

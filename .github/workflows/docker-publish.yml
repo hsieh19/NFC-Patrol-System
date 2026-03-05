@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - master # 也可以在推送到 master 时构建
 
 env:
   REGISTRY: ghcr.io
@@ -12,13 +14,16 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        db_type: [mysql, sqlite] # 矩阵构建两个版本
     permissions:
       contents: read
       packages: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+          uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -36,16 +41,21 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+            # 如果是 mysql，打上版本号和 latest 标签
+            type=semver,pattern={{version}},enable=${{ matrix.db_type == 'mysql' }}
+            type=raw,value=latest,enable=${{ matrix.db_type == 'mysql' }}
+            # 如果是 sqlite，打上 -sqlite 后缀的标签
+            type=raw,value=latest-sqlite,enable=${{ matrix.db_type == 'sqlite' }}
+            type=semver,pattern={{version}}-sqlite,enable=${{ matrix.db_type == 'sqlite' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ id.meta.outputs.tags }}
-          labels: ${{ id.meta.outputs.labels }}
+          build-args: |
+            DB_TYPE=${{ matrix.db_type }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
