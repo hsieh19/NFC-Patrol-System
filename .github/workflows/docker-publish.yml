@@ -4,26 +4,25 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - master # 也可以在推送到 master 时构建
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # Job 1: Build and Push Docker Images
   build-and-push:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        db_type: [mysql, sqlite] # 矩阵构建两个版本
+        db_type: [mysql, sqlite]
     permissions:
       contents: read
       packages: write
 
     steps:
       - name: Checkout repository
-          uses: actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -41,10 +40,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # 如果是 mysql，打上版本号和 latest 标签
             type=semver,pattern={{version}},enable=${{ matrix.db_type == 'mysql' }}
             type=raw,value=latest,enable=${{ matrix.db_type == 'mysql' }}
-            # 如果是 sqlite，打上 -sqlite 后缀的标签
             type=raw,value=latest-sqlite,enable=${{ matrix.db_type == 'sqlite' }}
             type=semver,pattern={{version}}-sqlite,enable=${{ matrix.db_type == 'sqlite' }}
 
@@ -59,3 +56,45 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Job 2: Create GitHub Release
+  create-release:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Changelog Section
+        id: extract_changelog
+        shell: bash
+        run: |
+          # 提取当前 tag 对应版本的 changelog 内容
+          # 假设格式为 ## [v0.1.0] - 日期
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          # 移除 v 前缀以匹配 CHANGELOG 中的 [0.1.0]
+          VERSION_NUM=${TAG_NAME#v}
+          
+          # 这里的 sed 逻辑是从匹配到当前版本行开始，直到遇到下一个 ## 开头的行为止
+          # 如果没有下一个 ##，则直到文件末尾
+          sed -n "/## \[$VERSION_NUM\]/,/## \[/p" CHANGELOG.md | sed '$d' > release_notes.md
+          
+          # 检查文件是否为空
+          if [ ! -s release_notes.md ]; then
+            echo "No changelog info found for $VERSION_NUM. Using generic message."
+            echo "Release $TAG_NAME" > release_notes.md
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
