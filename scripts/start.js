@@ -54,5 +54,6 @@ try {
 // 启动开发服务器
 const isHttps = process.argv.includes('--https');
 console.log(`🚀 正在启动${isHttps ? ' HTTPS ' : ''}开发服务器...`);
-const devCommand = isHttps ? 'next dev --experimental-https' : 'next dev';
+
+const devCommand = isHttps ? 'npx next dev --experimental-https' : 'npx next dev';
 execSync(devCommand, { stdio: 'inherit' });

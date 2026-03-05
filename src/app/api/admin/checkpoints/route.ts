@@ -12,15 +12,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
     const user = await getAuthUser(req);
-    let whereClause = {};
+    let whereClause: any = {};
+
     if (user?.roleCode !== 'SUPER_ADMIN') {
-      const gid = user?.groupId || null;
-      whereClause = {
-        OR: [
-          { groupId: gid },
-          { groupId: null }
-        ]
-      };
+      const gid = user?.groupId;
+      // Note: Checkpoint.groupId is a required field, so we only filter by the user's group.
+      // If the user has no group, they won't see any checkpoints.
+      whereClause.groupId = gid || 'NON_EXISTENT';
     }
 
     const checkpoints = await db.checkpoint.findMany({

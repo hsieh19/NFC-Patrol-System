@@ -16,16 +16,12 @@ export async function GET(req: NextRequest) {
 
     const user = await getAuthUser(req);
     let whereClause: any = { isArchived: showArchived };
+
     if (user?.roleCode !== 'SUPER_ADMIN') {
-      const gid = user?.groupId || null;
-      // 允许读取没有分配分组的系统级通用计划 (如果系统有这类计划)
-      whereClause = {
-        isArchived: showArchived,
-        OR: [
-          { groupId: gid },
-          { groupId: null }
-        ]
-      };
+      const gid = user?.groupId;
+      // Note: Plan.groupId is a required field, so we only filter by the user's group.
+      // If the user has no group, they won't see any plans.
+      whereClause.groupId = gid || 'NON_EXISTENT';
     }
 
     const schedules = await db.plan.findMany({

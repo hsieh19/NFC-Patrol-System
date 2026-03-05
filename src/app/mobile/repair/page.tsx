@@ -119,13 +119,11 @@ export default function RepairPage() {
                 </div>
 
                 <button
-                    onClick={handleSubmit}
-                    disabled={!description || submitting}
-                    className={`mt-4 w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-white transition-all shadow-lg ${!description || submitting ? "bg-gray-300 shadow-none" : "bg-orange-500 hover:bg-orange-600 active:scale-95 shadow-orange-200"
-                        }`}
+                    disabled={true}
+                    className="mt-4 w-full py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-white transition-all bg-gray-300 cursor-not-allowed"
                 >
                     <Send className="w-5 h-5" />
-                    {submitting ? "提交中..." : "一键提报"}
+                    功能维护中
                 </button>
             </main>
         </div>

@@ -13,11 +13,11 @@ export const config = {
          * - login (login page)
          * - init (init page)
          */
-        '/((?!api|_next/static|_next/image|favicon.ico|login|init).*)',
+        '/((?!api|_next/static|_next/image|favicon.ico|login|init|sw\\.js|manifest|icons|rootCA\\.crt).*)',
     ],
 };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     // 检查是否在登录页面，如果是的话不拦截（上面的 matcher 已经排除了 login，但这里可以再次防范）
     const pathname = request.nextUrl.pathname;
     if (pathname.startsWith('/login') || pathname.startsWith('/init')) {

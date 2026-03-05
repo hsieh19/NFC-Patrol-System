@@ -5,8 +5,15 @@ import { Toaster } from "@/components/ui/sonner";
 export const metadata: Metadata = {
   title: "运维南区巡更系统-移动端",
   description: "巡更系统移动端",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
 };
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 
 export default function MobileLayout({
   children,

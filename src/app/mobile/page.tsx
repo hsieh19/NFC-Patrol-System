@@ -420,13 +420,19 @@ export default function MobileHome() {
 
         <div className="grid grid-cols-2 gap-4">
           <div
-            onClick={() => router.push("/mobile/repair")}
+            onClick={() => {
+              if (hasPermission("APP_REPAIR")) {
+                router.push("/mobile/repair");
+              } else {
+                toast.error("抱歉，您当前账号没有异常报修权限");
+              }
+            }}
             className="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm flex flex-col items-center gap-3 cursor-pointer hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-colors border border-gray-100 dark:border-zinc-800 active:scale-95 group"
           >
-            <div className="w-12 h-12 rounded-xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center group-hover:bg-orange-500 transition-colors">
-              <ShieldAlert className="w-6 h-6 text-orange-500 group-hover:text-white transition-colors" />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${hasPermission("APP_REPAIR") ? "bg-orange-50 dark:bg-orange-900/20 group-hover:bg-orange-500" : "bg-gray-50 dark:bg-zinc-800"}`}>
+              <ShieldAlert className={`w-6 h-6 transition-colors ${hasPermission("APP_REPAIR") ? "text-orange-500 group-hover:text-white" : "text-gray-300"}`} />
             </div>
-            <span className="text-sm font-bold text-gray-900 dark:text-gray-100">异常报修</span>
+            <span className={`text-sm font-bold transition-colors ${hasPermission("APP_REPAIR") ? "text-gray-900 dark:text-gray-100" : "text-gray-400"}`}>异常报修</span>
           </div>
 
           <div
