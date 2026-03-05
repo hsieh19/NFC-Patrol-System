@@ -135,7 +135,10 @@ docker-compose up -d
 ## 🔐 内网生产环境关键配置 (必读)
 
 ### 1. Nginx 反向代理 (SSL 卸载)
-**核心要求**：由于 PWA 离线功能与 Web NFC 扫码必须在 **Secure Context (HTTPS)** 下运行，内网部署必须通过 Nginx 等代理层提供 HTTPS。您可参考项目文档中的 Nginx 配置模版。
+**核心要求**：由于 PWA 离线功能与 Web NFC 扫码必须在 **Secure Context (HTTPS)** 下运行，内网部署必须通过 Nginx 等代理层提供 HTTPS。
+
+详细配置请参考：[Nginx 生产环境配置指南](./docs/nginx.md)
+
 
 
 ### 2. 注意事项
