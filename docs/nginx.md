@@ -55,3 +55,52 @@ server {
 1. **`X-Forwarded-Proto $scheme`**: 极其重要。Next.js 和 PWA 脚本会检查这个头。如果缺失，Service Worker 可能认为环境不安全而拒绝注册。
 2. **`proxy_pass`**: 这里填写您 Docker 容器映射到宿主机的端口。
 3. **域名/IP**: `server_name` 必须与您在 `.env` 中配置的 `NEXT_PUBLIC_BASE_URL` 完全匹配。
+
+---
+
+## 内网 HTTPS 证书方案 (基于 mkcert)
+
+如果您在内网运行且没有备案域名，推荐使用 `mkcert` 工具快速生成受信任的本地证书。
+
+### 1. 生成证书 (在 Nginx 服务器上)
+
+```bash
+# 安装 mkcert
+apt update && apt install -y libnss3-tools wget
+wget -O /usr/local/bin/mkcert https://dl.filippo.io/mkcert/latest?for=linux/amd64
+chmod +x /usr/local/bin/mkcert
+
+# 注册本地 CA
+mkcert -install
+
+# 生成证书 (列出所有访问 IP 和内网域名)
+mkdir -p /etc/nginx/certs
+mkcert -key-file /etc/nginx/certs/key.pem -cert-file /etc/nginx/certs/cert.pem \
+  192.168.1.100 patrol.internal.com localhost 127.0.0.1
+```
+
+### 2. 终端设备加信 (手机/电脑)
+
+自签名证书必须在访问设备上安装并信任“根证书”后，PWA 的离线功能和 NFC 权限才能被激活。
+
+#### 找到根证书文件
+在服务器运行指令查看路径：
+```bash
+mkcert -CAROOT
+# 通常在 /root/.local/share/mkcert/rootCA.pem
+```
+
+#### Windows 安装
+1. 将 `rootCA.pem` 重命名为 `rootCA.crt`。
+2. 右键点击“安装证书” -> 选择“本地计算机”。
+3. **关键**：选择“将所有的证书都放入下列存储”，浏览并选中 **“受信任的根证书颁发机构”**。
+4. 重启浏览器。
+
+#### 手机 (Android/iOS) 安装
+1. 通过微信或浏览器将 `rootCA.pem` 下载到手机。
+2. **Android**: 进入“设置” -> “安全/加密” -> “安装证书” -> “CA 证书”。
+3. **iOS**: 下载描述文件后，在“设置”中完成安装，并到“关于本机”的“证书信任设置”中开启手动开关。
+
+### 3. 注意事项
+* **PWA 环境**: 证书必须包含 `SAN (Subject Alternative Name)`。使用 `mkcert` 会自动处理这点，避免 Chrome 报错。
+* **刷新机制**: 如果更换了内网 IP，必须重新执行 `mkcert` 生成步骤。
