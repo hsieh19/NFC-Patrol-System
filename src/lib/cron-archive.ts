@@ -31,9 +31,10 @@ export async function runAutoArchive() {
             }
 
             // 使用事务保证迁移的原子性（强一致性）
-            await db.$transaction(async (tx) => {
+            const recordIds = oldRecords.map(r => r.id);
+            await db.$transaction([
                 // 1. 将数据完整复制进历史归档表
-                await tx.patrolRecordArchive.createMany({
+                db.patrolRecordArchive.createMany({
                     data: oldRecords.map(r => ({
                         id: r.id,
                         checkpointId: r.checkpointId,
@@ -44,16 +45,13 @@ export async function runAutoArchive() {
                         notes: r.notes,
                         offlineId: r.offlineId,
                         createdAt: r.createdAt
-                    })),
-                    skipDuplicates: true // 增加容错，防止意外重复插入抛错
-                });
-
+                    }))
+                }),
                 // 2. 从原主表中将这批数据删除
-                const recordIds = oldRecords.map(r => r.id);
-                await tx.patrolRecord.deleteMany({
+                db.patrolRecord.deleteMany({
                     where: { id: { in: recordIds } }
-                });
-            });
+                })
+            ]);
 
             totalArchived += oldRecords.length;
 
