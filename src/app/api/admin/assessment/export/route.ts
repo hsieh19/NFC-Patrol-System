@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 import { parse, format, addDays, eachDayOfInterval, differenceInCalendarDays } from 'date-fns';
 import { checkPermission } from '@/lib/auth';
+import { fetchPatrolRecordsByDateRange } from '@/lib/record-utils';
 
 /**
  * GET /api/admin/assessment/export
@@ -61,14 +62,12 @@ export async function GET(req: NextRequest) {
         rangeEnd.setHours(23, 59, 59, 999);
 
         const allCheckpointIds = [...new Set(plans.flatMap(p => p.route.checkpoints.map(cp => cp.checkpointId)))];
-        const allRecords = await db.patrolRecord.findMany({
-            where: {
-                createdAt: { gte: rangeStart, lte: rangeEnd },
-                checkpointId: { in: allCheckpointIds }
-            },
-            include: { user: true },
-            orderBy: { createdAt: 'asc' }
-        });
+        const allRecords = await fetchPatrolRecordsByDateRange(
+            rangeStart,
+            rangeEnd,
+            allCheckpointIds,
+            true // includeUser = true
+        );
 
         // 优化缓存：防止 O(N*P*D)
         const recordsByCheckpoint: Record<string, typeof allRecords> = {};

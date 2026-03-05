@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 import { addDays, parse, format, differenceInCalendarDays, eachDayOfInterval } from 'date-fns';
 import { checkPermission } from '@/lib/auth';
+import { fetchPatrolRecordsByDateRange } from '@/lib/record-utils';
 
 export async function GET(req: NextRequest) {
     try {
@@ -47,13 +48,12 @@ export async function GET(req: NextRequest) {
         const rangeWindowEnd = new Date(endDate);
         rangeWindowEnd.setHours(23, 59, 59, 999);
 
-        const allRecords = await db.patrolRecord.findMany({
-            where: {
-                createdAt: { gte: rangeWindowStart, lte: rangeWindowEnd },
-                checkpointId: { in: allCheckpointIds }
-            },
-            orderBy: { createdAt: 'asc' }
-        });
+        const allRecords = await fetchPatrolRecordsByDateRange(
+            rangeWindowStart,
+            rangeWindowEnd,
+            allCheckpointIds,
+            false
+        );
 
         // 优化：按 checkpointId 预先分组记录，将原先 O(N*P*D) 的过滤复杂度降至 O(N + P*D*C)
         const recordsByCheckpoint: Record<string, typeof allRecords> = {};
