@@ -43,5 +43,4 @@ All notable changes to this project will be documented in this file.
 - 修复了 `manifest.ts` 与静态文件冲突导致的 PWA 解析失败。
 - 优化了 proxy 拦截逻辑，确保 PWA 核心资源（SW/Manifest）不受权限限制。
 
----
-*注：版本 0.1.0 之后的所有非兼容性变更都将在此文档中记录。*
+

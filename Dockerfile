@@ -12,9 +12,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 根据矩阵变量动态切换数据库引擎
-RUN if [ "$DB_TYPE" = "sqlite" ]; then \
-    sed -i 's/provider = "mysql"/provider = "sqlite"/' prisma/schema.prisma; \
+# 如果是 mysql 模式，修改 schema.prisma
+RUN if [ "$DB_TYPE" = "mysql" ]; then \
+    sed -i 's/provider = "sqlite"/provider = "mysql"/' prisma/schema.prisma; \
     fi
 
 RUN npx prisma generate
