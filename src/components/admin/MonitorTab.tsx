@@ -9,9 +9,11 @@ interface Record {
     createdAt: string;
     checkpointName: string | null;
     checkpointLocation: string | null;
+    notes: string | null;
     checkpoint?: {
         name: string;
         location: string | null;
+        nfcTagId: string;
     } | null;
     user: {
         name: string;
@@ -64,23 +66,27 @@ export default function MonitorTab() {
                     <thead>
                         <tr className="border-b border-gray-100">
                             <th className="pb-4 font-semibold text-sm text-gray-500 w-[15%] px-4">感应时间</th>
-                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[20%] px-4">巡检点名称</th>
-                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[20%] px-4">物理位置</th>
-                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[15%] px-4">操作员</th>
-                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[15%] px-4">状态</th>
-                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[15%] px-4">上传方式</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[15%] px-4">标签卡号</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[18%] px-4">巡检点名称</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[18%] px-4">物理位置</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[12%] px-4">操作员</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[10%] px-4">状态</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-500 w-[12%] px-4">上传方式</th>
                         </tr>
                     </thead>
                     <tbody className="text-sm">
                         {records.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="py-10 text-center text-gray-400">暂无打卡记录</td>
+                                <td colSpan={7} className="py-10 text-center text-gray-400">暂无打卡记录</td>
                             </tr>
                         ) : (
                             records.map((record) => (
                                 <tr key={record.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                                     <td className="py-4 px-4 text-gray-600 font-medium">
                                         {format(new Date(record.createdAt), "MM-dd HH:mm:ss", { locale: zhCN })}
+                                    </td>
+                                    <td className="py-4 px-4 text-blue-600 font-mono font-semibold select-all cursor-pointer hover:text-blue-700 transition-colors" title="点击即可全选复制卡号">
+                                        {record.checkpoint?.nfcTagId || (record.notes?.includes("未注册的卡号: ") ? record.notes.split("未注册的卡号: ")[1] : "-")}
                                     </td>
                                     <td className="py-4 px-4 text-[#0f172a] font-semibold tracking-wide">
                                         {record.checkpoint?.name || record.checkpointName || "未知点位"}

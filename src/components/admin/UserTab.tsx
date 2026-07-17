@@ -1,9 +1,25 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { UserPlus, User as UserIcon } from "lucide-react";
+import { UserPlus, User as UserIcon, Cpu, Copy, Plus, RefreshCw, Trash2, Edit2, ShieldAlert } from "lucide-react";
 import { ALL_PERMISSIONS } from "@/lib/permissions";
 import { usePermissions } from "@/hooks/use-permissions";
+
+interface PatrolWand {
+    id: string;
+    uuid: string;
+    name: string;
+    cardType: string;
+    ipAddress: string | null;
+    lastSeen: string | null;
+    userId: string | null;
+    shouldWakeServer: boolean;
+    user?: {
+        id: string;
+        name: string;
+        username: string;
+    } | null;
+}
 
 interface User {
     id: string;
@@ -14,6 +30,7 @@ interface User {
     department: string | null;
     groupId?: string | null;
     group?: { id: string, name: string } | null;
+    patrolWand?: PatrolWand | null;
 }
 
 interface Group {
@@ -75,6 +92,12 @@ export default function UserTab() {
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
     const [userForm, setUserForm] = useState({ username: "", name: "", roleCode: "OPERATOR", groupId: "", password: "" });
     const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
+
+    // 巡更棒管理状态
+    const [wands, setWands] = useState<PatrolWand[]>([]);
+    const [editingWand, setEditingWand] = useState<PatrolWand | null>(null);
+    const [isWandModalOpen, setIsWandModalOpen] = useState(false);
+    const [wandForm, setWandForm] = useState({ uuid: "", name: "", cardType: "IC", userId: "" });
 
     useEffect(() => {
         const userData = localStorage.getItem("user");
@@ -241,10 +264,63 @@ export default function UserTab() {
         }
     };
 
+    const fetchWands = async () => {
+        try {
+            const res = await fetch(`/api/admin/wands?_t=${Date.now()}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (Array.isArray(data)) setWands(data);
+        } catch (error) {
+            console.error("Failed to fetch wands:", error);
+        }
+    };
+
+    const handleSaveWand = async () => {
+        if (!wandForm.name) {
+            alert("设备名称必填");
+            return;
+        }
+        try {
+            const url = editingWand ? `/api/admin/wands/${editingWand.id}` : "/api/admin/wands";
+            const method = editingWand ? "PUT" : "POST";
+
+            const res = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(wandForm),
+            });
+            if (res.ok) {
+                setIsWandModalOpen(false);
+                fetchWands();
+            } else {
+                const data = await res.json();
+                alert(data.error || "保存失败");
+            }
+        } catch (error) {
+            console.error("Save wand error:", error);
+        }
+    };
+
+    const handleDeleteWand = async (id: string) => {
+        if (!confirm("确定要注销此巡更棒吗？")) return;
+        try {
+            const res = await fetch(`/api/admin/wands/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                fetchWands();
+            } else {
+                const data = await res.json();
+                alert(data.error || "注销失败");
+            }
+        } catch (error) {
+            console.error("Delete wand error:", error);
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
         fetchGroups();
         fetchRoles();
+        fetchWands();
     }, []);
 
     if (loading || permissionLoading) return <div className="py-20 text-center">加载中...</div>;
@@ -280,6 +356,15 @@ export default function UserTab() {
                             {subTab === "users" && <span className="absolute -bottom-[18px] left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
                         </h2>
                     )}
+                    {canManageUsers && (
+                        <h2
+                            onClick={() => setSubTab("wands")}
+                            className={`text-lg font-bold tracking-tight cursor-pointer transition-colors relative ${subTab === "wands" ? "text-[#0f172a]" : "text-gray-400 hover:text-gray-600"}`}
+                        >
+                            巡更棒管理
+                            {subTab === "wands" && <span className="absolute -bottom-[18px] left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></span>}
+                        </h2>
+                    )}
                 </div>
                 {subTab === "users" && canManageUsers && (
                     <button
@@ -294,6 +379,25 @@ export default function UserTab() {
                     >
                         <UserPlus className="w-4 h-4" />
                         新建人员
+                    </button>
+                )}
+                {subTab === "wands" && canManageUsers && (
+                    <button
+                        onClick={() => {
+                            setEditingWand(null);
+                            const uuidGen = () => {
+                                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                                    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                                    return v.toString(16);
+                                });
+                            };
+                            setWandForm({ uuid: uuidGen(), name: "", cardType: "IC", userId: "" });
+                            setIsWandModalOpen(true);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-sm"
+                    >
+                        <Plus className="w-4 h-4" />
+                        注册巡更棒
                     </button>
                 )}
                 {subTab === "groups" && canManageGroups && (
@@ -388,6 +492,154 @@ export default function UserTab() {
                                     <tr>
                                         <td colSpan={4} className="py-12 text-center text-gray-400 font-medium">
                                             暂无人员记录
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )
+            }
+
+            {
+                subTab === "wands" && (
+                    <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-gray-100 bg-gray-50/50">
+                                    <th className="py-4 px-6 font-semibold text-sm text-gray-500">设备名称</th>
+                                    <th className="py-4 px-6 font-semibold text-sm text-gray-500">授权 UUID</th>
+                                    <th className="py-4 px-6 font-semibold text-sm text-gray-500">模式</th>
+                                    <th className="py-4 px-6 font-semibold text-sm text-gray-500">局域网 IP</th>
+                                    <th className="py-4 px-6 font-semibold text-sm text-gray-500">状态</th>
+                                    <th className="py-4 px-6 font-semibold text-sm text-gray-500">指派人员</th>
+                                    <th className="py-4 px-6 font-semibold text-sm text-gray-500 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {wands.map((wand) => {
+                                    const isOnline = wand.lastSeen && (Date.now() - new Date(wand.lastSeen).getTime() < 180000);
+                                    return (
+                                        <tr key={wand.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                                            <td className="py-4 px-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                                                        <Cpu className="w-4 h-4" />
+                                                    </div>
+                                                    <span className="font-semibold text-gray-900">{wand.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-6">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded max-w-[120px] truncate" title={wand.uuid}>
+                                                        {wand.uuid}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(wand.uuid);
+                                                            alert("UUID 已复制到剪贴板");
+                                                        }}
+                                                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                                                        title="复制 UUID"
+                                                    >
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-6">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                    wand.cardType === 'ID' ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'
+                                                }`}>
+                                                    {wand.cardType === 'ID' ? 'ID卡 (125KHz)' : 'IC卡 (13.56M)'}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-6">
+                                                {wand.ipAddress ? (
+                                                    <a 
+                                                        href={`http://${wand.ipAddress}`} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="font-mono text-xs text-blue-600 hover:underline"
+                                                    >
+                                                        {wand.ipAddress}
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 font-mono">-</span>
+                                                )}
+                                            </td>
+                                            <td className="py-4 px-6">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`h-2.5 w-2.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
+                                                    <span className="text-xs font-semibold text-gray-600">
+                                                        {isOnline ? '在线' : '离线'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-6 text-sm text-gray-600">
+                                                {wand.user ? (
+                                                    <span className="font-semibold text-gray-800">{wand.user.name} <span className="text-xs font-normal text-gray-400">({wand.user.username})</span></span>
+                                                ) : (
+                                                    <span className="text-gray-400 italic">未指派</span>
+                                                )}
+                                            </td>
+                                            <td className="py-4 px-6 text-right space-x-3">
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res = await fetch(`/api/admin/wands/${wand.id}`, {
+                                                                method: 'PATCH',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({ shouldWakeServer: true }),
+                                                            });
+                                                            if (res.ok) {
+                                                                alert("已发送唤醒指令！将在巡更棒下次连网同步时自动拉起 HTTP 配置服务。");
+                                                                fetchWands();
+                                                            } else {
+                                                                const errData = await res.json();
+                                                                alert("发送唤醒指令失败: " + (errData.error || "未知错误"));
+                                                            }
+                                                        } catch (e) {
+                                                            alert("网络异常，发送失败！");
+                                                        }
+                                                    }}
+                                                    disabled={wand.shouldWakeServer}
+                                                    className={`text-sm font-medium transition-colors ${
+                                                        wand.shouldWakeServer 
+                                                            ? 'text-gray-400 cursor-not-allowed' 
+                                                            : 'text-emerald-600 hover:text-[#059669]'
+                                                    }`}
+                                                >
+                                                    {wand.shouldWakeServer ? "等待唤醒" : "唤醒"}
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setEditingWand(wand);
+                                                        setWandForm({
+                                                            uuid: wand.uuid,
+                                                            name: wand.name,
+                                                            cardType: wand.cardType,
+                                                            userId: wand.userId || ""
+                                                        });
+                                                        setIsWandModalOpen(true);
+                                                    }}
+                                                    className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                                                >
+                                                    编辑
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteWand(wand.id)}
+                                                    className="text-sm font-medium text-red-500 hover:text-red-700 transition-colors"
+                                                >
+                                                    注销
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {wands.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="py-12 text-center text-gray-400 font-medium">
+                                            暂无巡更棒记录
                                         </td>
                                     </tr>
                                 )}
@@ -730,6 +982,106 @@ export default function UserTab() {
                                     onClick={handleSaveRole}
                                     disabled={!roleForm.name || !roleForm.code || !!editingRole?.isSystem}
                                     className="px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                >
+                                    保存
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* 注册/编辑巡更棒 Modal */}
+            {
+                isWandModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white rounded-2xl p-6 w-[440px] shadow-2xl scale-in-center">
+                            <h3 className="text-xl font-bold mb-4">{editingWand ? '编辑巡更棒' : '注册巡更棒'}</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">设备名称</label>
+                                    <input
+                                        type="text"
+                                        value={wandForm.name}
+                                        onChange={(e) => setWandForm({ ...wandForm, name: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors"
+                                        placeholder="如：南区01号巡更棒 (必填)"
+                                    />
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-sm font-medium text-gray-700">授权 UUID</label>
+                                        <button 
+                                            onClick={() => {
+                                                const uuidGen = () => {
+                                                    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                                                        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                                                        return v.toString(16);
+                                                    });
+                                                };
+                                                setWandForm({ ...wandForm, uuid: uuidGen() });
+                                            }}
+                                            className="text-xs text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 font-bold"
+                                        >
+                                            <RefreshCw className="w-3 h-3" />
+                                            生成随机 UUID
+                                        </button>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={wandForm.uuid}
+                                        onChange={(e) => setWandForm({ ...wandForm, uuid: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors font-mono text-sm"
+                                        placeholder="输入授权 UUID"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">读卡工作模式</label>
+                                    <select
+                                        value={wandForm.cardType}
+                                        onChange={(e) => setWandForm({ ...wandForm, cardType: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors bg-white"
+                                    >
+                                        <option value="IC">IC卡模式 (RC522 - 13.56MHz)</option>
+                                        <option value="ID">ID卡模式 (RDM6300 - 125KHz)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">指派巡更人员</label>
+                                    <select
+                                        value={wandForm.userId}
+                                        onChange={(e) => setWandForm({ ...wandForm, userId: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors bg-white"
+                                    >
+                                        <option value="">-- 未指派 (暂不分配) --</option>
+                                        {users
+                                            .filter(u => {
+                                                return ['OPERATOR', 'SECURITY'].includes(u.roleCode);
+                                            })
+                                            .map(u => {
+                                                const boundWand = wands.find(w => w.userId === u.id && w.id !== editingWand?.id);
+                                                const labelSuffix = boundWand ? ` (已绑定: ${boundWand.name})` : '';
+                                                return (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.name} ({u.username}){labelSuffix}
+                                                    </option>
+                                                );
+                                            })}
+                                    </select>
+                                    <p className="text-[10px] text-gray-400 mt-1">* 巡更棒与巡更员为 1对1 绑定。指派已绑定的人员将自动解除该人员与先前巡更棒的关联。</p>
+                                </div>
+                            </div>
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button
+                                    onClick={() => setIsWandModalOpen(false)}
+                                    className="px-4 py-2 rounded-lg text-gray-600 bg-gray-100 hover:bg-gray-200 font-medium"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={handleSaveWand}
+                                    disabled={!wandForm.name || !wandForm.uuid}
+                                    className="px-4 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 font-medium"
                                 >
                                     保存
                                 </button>

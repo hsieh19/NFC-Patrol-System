@@ -74,7 +74,7 @@ export default function AdminDashboard() {
         if (userStr) {
             try {
                 const parsed = JSON.parse(userStr);
-                // 兼容旧的 role 字段
+                // 兼容旧的 role 字段（旧版本登录写入的是 role，新版本是 roleCode）
                 setCurrentUser({
                     ...parsed,
                     roleCode: parsed.roleCode || parsed.role

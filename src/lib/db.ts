@@ -37,5 +37,6 @@ export const db =
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
 
-// 启动后台自动归档调度器
+// 启动后台自动归档调度器（仅在 Node.js Runtime 下生效，Edge Runtime 不支持 setInterval 持久运行）
+// 注意：此副作用在任何导入 db 模块的地方都会触发；测试环境中建议 mock 此模块。
 import('./cron-archive').then(m => m.initAutoArchive()).catch(console.error);

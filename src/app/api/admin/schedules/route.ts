@@ -5,23 +5,33 @@ import { checkPermission, getAuthUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    const hasAdminPerm = await checkPermission(req, 'ADMIN_SCHEDULE');
-    const hasScanPerm = await checkPermission(req, 'APP_SCAN');
+    // 一次 DB 查询获取用户，同时用于权限检查和数据过滤
+    const user = await getAuthUser(req);
+    if (!user || !user.role) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
+
+    const permissions = JSON.parse(user.role.permissions || '[]') as string[];
+    const hasAdminPerm = permissions.includes('ALL') || permissions.includes('ADMIN_SCHEDULE');
+    const hasScanPerm = permissions.includes('ALL') || permissions.includes('APP_SCAN');
 
     if (!hasAdminPerm && !hasScanPerm) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
+
     const { searchParams } = new URL(req.url);
     const showArchived = searchParams.get('archived') === 'true';
 
-    const user = await getAuthUser(req);
-    let whereClause: any = { isArchived: showArchived };
+    type WhereClause = {
+      isArchived: boolean;
+      groupId?: string;
+    };
+    const whereClause: WhereClause = { isArchived: showArchived };
 
-    if (user?.roleCode !== 'SUPER_ADMIN') {
-      const gid = user?.groupId;
+    if (user.roleCode !== 'SUPER_ADMIN') {
       // Note: Plan.groupId is a required field, so we only filter by the user's group.
       // If the user has no group, they won't see any plans.
-      whereClause.groupId = gid || 'NON_EXISTENT';
+      whereClause.groupId = user.groupId || 'NON_EXISTENT';
     }
 
     const schedules = await db.plan.findMany({

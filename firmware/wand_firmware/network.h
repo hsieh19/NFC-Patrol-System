@@ -1,0 +1,197 @@
+#ifndef NETWORK_H
+#define NETWORK_H
+
+#include "config.h"
+#include "utils.h"
+#include "storage.h"
+
+// 前置声明外部 Web 状态服务器开启函数 (在 web_server.h 中定义)，避免循环引用
+extern void startWebServerSTA();
+
+// ==========================================
+// 实时打卡单条记录上传逻辑
+// ==========================================
+bool uploadSingleRecord(String cardId, unsigned long long ts) {
+    if (WiFi.status() != WL_CONNECTED) return false;
+    
+    HTTPClient http;
+    String url = serverUrl + "/api/patrol/hardware-upload";
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+    
+    String payload = "{\"wandUuid\":\"" + wandUuid + "\",\"records\":[{\"cardId\":\"" + cardId + "\",\"timestamp\":" + String(ts) + "}]}";
+    int code = http.POST(payload);
+    
+    bool success = false;
+    if (code == 200) {
+        String response = http.getString();
+        
+        // 实时响应可能包含工作模式变更 cardType，解析以保持同步
+        int typeIdx = response.indexOf("\"cardType\":\"");
+        if (typeIdx != -1) {
+            String serverMode = response.substring(typeIdx + 12);
+            int quoteIdx = serverMode.indexOf("\"");
+            if (quoteIdx != -1) {
+                serverMode = serverMode.substring(0, quoteIdx);
+                serverMode.trim();
+                if ((serverMode == "IC" || serverMode == "ID") && serverMode != cardType) {
+                    Serial.println("[配置变更] 实时打卡响应中发现工作模式变更: " + cardType + " -> " + serverMode + "，设备正在保存并重启...");
+                    preferences.putString("mode", serverMode);
+                    beep(100); delay(80);
+                    beep(100); delay(80);
+                    beep(500);
+                    delay(1000);
+                    ESP.restart();
+                }
+            }
+        }
+        success = true;
+    }
+    http.end();
+    return success;
+}
+
+// ==========================================
+// 硬件接口通讯：心跳发送与对时
+// ==========================================
+void sendHeartbeat() {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    HTTPClient http;
+    String url = serverUrl + "/api/patrol/heartbeat";
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"wandUuid\":\"" + wandUuid + "\",\"ipAddress\":\"" + WiFi.localIP().toString() + "\"}";
+    
+    Serial.println("[心跳上报] 载荷: " + payload);
+    int code = http.POST(payload);
+    
+    if (code == 200) {
+        String response = http.getString();
+        Serial.println("[心跳响应] " + response);
+
+        // 简易解析 JSON 中的 serverTime (毫秒时间戳)
+        int timeIdx = response.indexOf("\"serverTime\":");
+        if (timeIdx != -1) {
+            String timeStr = response.substring(timeIdx + 13);
+            int commaIdx = timeStr.indexOf(",");
+            if (commaIdx != -1) timeStr = timeStr.substring(0, commaIdx);
+            timeStr.replace("}", "");
+            timeStr.trim();
+            unsigned long long serverTime = strtoull(timeStr.c_str(), NULL, 10);
+            syncLocalTime(serverTime);
+        }
+
+        // 简易解析 JSON 中的 wandName (设备名称)
+        int nameIdx = response.indexOf("\"wandName\":\"");
+        if (nameIdx != -1) {
+            String nameStr = response.substring(nameIdx + 12);
+            int quoteIdx = nameStr.indexOf("\"");
+            if (quoteIdx != -1) {
+                wandName = nameStr.substring(0, quoteIdx);
+                preferences.putString("name", wandName); // 缓存回 NVS
+                Serial.println("[名称同步] 服务端预设设备名称为: " + wandName);
+            }
+        }
+
+        // 简易解析 JSON 中的 cardType (读卡工作模式)
+        int typeIdx = response.indexOf("\"cardType\":\"");
+        if (typeIdx != -1) {
+            String serverMode = response.substring(typeIdx + 12);
+            int quoteIdx = serverMode.indexOf("\"");
+            if (quoteIdx != -1) {
+                serverMode = serverMode.substring(0, quoteIdx);
+                serverMode.trim();
+                // 若服务端配置的模式与设备当前工作模式不同，写入 NVS 并自动重启切换硬件驱动
+                if ((serverMode == "IC" || serverMode == "ID") && serverMode != cardType) {
+                    Serial.println("[配置变更] 服务端更改了读卡工作模式: " + cardType + " -> " + serverMode + "，设备将在写入 NVS 后自动重启！");
+                    preferences.putString("mode", serverMode);
+                    beep(100); delay(80);
+                    beep(100); delay(80);
+                    beep(500); 
+                    delay(1000);
+                    ESP.restart();
+                }
+            }
+        }
+
+        // 简易解析 JSON 中的 shouldWakeServer (远程唤醒)
+        int wakeIdx = response.indexOf("\"shouldWakeServer\":true");
+        if (wakeIdx != -1) {
+            Serial.println("[远程唤醒] 收到服务端唤醒指令！正在启用配置网页...");
+            startWebServerSTA();
+            lastHttpActivityTime = millis(); // 重置保活计时器 (3分钟调试期)
+            
+            // 鸣笛三声提示已唤醒
+            beep(100); delay(80);
+            beep(100); delay(80);
+            beep(100);
+        }
+    } else {
+        Serial.printf("[心跳异常] 发送失败, HTTP 状态码: %d\n", code);
+        if (code == 401) {
+            Serial.println("[授权失效] 本设备 UUID 校验失败！");
+        }
+    }
+    http.end();
+}
+
+// ==========================================
+// 离线缓存同步：上传至服务端并清空
+// ==========================================
+void syncOfflineRecords() {
+    if (WiFi.status() != WL_CONNECTED || !isTimeSynced) return;
+    if (!LittleFS.exists("/offline_records.txt")) return;
+
+    File file = LittleFS.open("/offline_records.txt", "r");
+    if (!file) return;
+
+    // 读取所有记录，组装 JSON 数组
+    String jsonRecords = "[";
+    bool first = true;
+    
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        line.trim();
+        if (line == "") continue;
+        
+        int commaIdx = line.indexOf(',');
+        if (commaIdx == -1) continue;
+        
+        String card = line.substring(0, commaIdx);
+        String ts = line.substring(commaIdx + 1);
+
+        if (!first) jsonRecords += ",";
+        jsonRecords += "{\"cardId\":\"" + card + "\",\"timestamp\":" + ts + "}";
+        first = false;
+    }
+    file.close();
+    jsonRecords += "]";
+
+    if (first) {
+        // 没有合法记录，直接删掉缓存文件即可
+        LittleFS.remove("/offline_records.txt");
+        return;
+    }
+
+    HTTPClient http;
+    String url = serverUrl + "/api/patrol/hardware-upload";
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{\"wandUuid\":\"" + wandUuid + "\",\"records\":" + jsonRecords + "}";
+    Serial.println("[数据同步] 正在上传离线缓冲记录...");
+    
+    int code = http.POST(payload);
+    if (code == 200) {
+        Serial.println("[同步成功] 服务端已成功保存，清空本地离线缓存。");
+        LittleFS.remove("/offline_records.txt");
+        beep(100); delay(80); beep(100); // 嘀嘀双声
+    } else {
+        Serial.printf("[同步失败] 接口返回状态码: %d，保留本地缓存以待重试。\n", code);
+    }
+    http.end();
+}
+
+#endif

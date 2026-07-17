@@ -1,20 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
-import { checkPermission, getAuthUser } from '@/lib/auth';
+import { getAuthUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    const hasMonitorPerm = await checkPermission(req, 'ADMIN_MONITOR');
-    const hasScanPerm = await checkPermission(req, 'APP_SCAN');
+    // 一次 DB 查询获取用户，同时用于权限检查和数据过滤
+    const currentUser = await getAuthUser(req);
+    if (!currentUser || !currentUser.role) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+    }
+
+    const permissions = JSON.parse(currentUser.role.permissions || '[]') as string[];
+    const hasMonitorPerm = permissions.includes('ALL') || permissions.includes('ADMIN_MONITOR');
+    const hasScanPerm = permissions.includes('ALL') || permissions.includes('APP_SCAN');
 
     if (!hasMonitorPerm && !hasScanPerm) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
-    const currentUser = await getAuthUser(req);
-    let whereClause: any = {};
-    if (currentUser?.roleCode !== 'SUPER_ADMIN') {
-      const gid = currentUser?.groupId || null;
+
+    type WhereClause = {
+      user?: { OR: Array<{ groupId: string | null }> };
+    };
+    let whereClause: WhereClause = {};
+    if (currentUser.roleCode !== 'SUPER_ADMIN') {
+      const gid = currentUser.groupId || null;
       whereClause = {
         user: {
           OR: [

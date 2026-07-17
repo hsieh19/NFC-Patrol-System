@@ -31,7 +31,9 @@ export function usePermissions() {
                 }
 
                 // Background refresh still good to stay synchronized
-                fetch(`/api/admin/roles/${parsed.roleCode || (parsed as any).role}`)
+                // 就算 localStorage 中存的是旧格式（role 为字符串，如 "SUPER_ADMIN"）也能兼容
+                const roleCodeForFetch = parsed.roleCode || (typeof (parsed as any).role === 'string' ? (parsed as any).role : '');
+                fetch(`/api/admin/roles/${roleCodeForFetch}`)
                     .then(res => {
                         if (!res.ok) throw new Error('Failed to fetch role');
                         return res.json();

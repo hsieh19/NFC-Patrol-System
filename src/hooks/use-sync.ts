@@ -43,9 +43,6 @@ export function useSync() {
       const unsyncedRepairs = await offlineDb.repairReports.where("synced").equals(0).toArray();
       for (const r of unsyncedRepairs) {
         try {
-          const storedUser = localStorage.getItem("user");
-          const userId = storedUser ? JSON.parse(storedUser).id : "guest_user";
-
           const res = await fetch("/api/repair/submit", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

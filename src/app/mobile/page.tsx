@@ -57,7 +57,7 @@ export default function MobileHome() {
         const parsed = JSON.parse(userStr);
         setCurrentUser({
           ...parsed,
-          roleCode: parsed.roleCode || parsed.role
+          roleCode: parsed.roleCode
         });
       } catch (e) {
         console.error("Failed to parse user info", e);

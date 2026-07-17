@@ -6,11 +6,15 @@ import { checkPermission, getAuthUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
     try {
-        const canManageRoles = await checkPermission(req, 'ADMIN_ROLE_MANAGE');
         const user = await getAuthUser(req);
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const canManageRoles = await checkPermission(req, 'ADMIN_ROLE_MANAGE');
 
         let whereClause = {};
-        if (!canManageRoles && user?.roleCode === 'ADMIN') {
+        if (!canManageRoles && user.roleCode === 'ADMIN') {
             whereClause = { code: { in: ['OPERATOR', 'SECURITY'] } };
         }
 
@@ -24,7 +28,6 @@ export async function GET(req: NextRequest) {
             }
         });
 
-        // Auto-seed system roles if not present
         // Auto-seed system roles if not present (only if no whereClause is applied)
         if (roles.length === 0 && Object.keys(whereClause).length === 0) {
             await db.role.createMany({

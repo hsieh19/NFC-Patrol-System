@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
         id: user.id,
         username: user.username,
         name: user.name,
-        role: user.roleCode,
+        roleCode: user.roleCode,
         groupId: user.groupId,
         permissions: permissions
       },
@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
       path: '/',
       maxAge: 86400, // 24 hours
       sameSite: 'lax',
-      httpOnly: false, // set to false because we might need to access it on client side for now, though better to use httpOnly
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
     });
 
     return response;

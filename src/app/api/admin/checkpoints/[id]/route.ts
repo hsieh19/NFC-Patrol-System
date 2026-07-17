@@ -27,8 +27,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
     const p = await params;
-    const { nfcTagId, name, location, groupId, roleCode, creatorId } = await req.json();
-    console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId, roleCode, creatorId });
+    const { nfcTagId, name, location, groupId, roleCode, creatorId, cardType } = await req.json();
+    console.log(`[API] Updating checkpoint ${p.id}:`, { nfcTagId, name, location, groupId, roleCode, creatorId, cardType });
 
     const creator = await getAuthUser(req);
 
@@ -50,6 +50,7 @@ export async function PATCH(
         nfcTagId: xss(nfcTagId),
         name: xss(name),
         location: location ? xss(location) : null,
+        cardType: cardType === 'ID' ? 'ID' : 'IC',
         groupId: targetGroupId,
         roleCode
       },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
+import { SYSTEM_CONSTANTS } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,8 +26,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const actualUserId = userId;
-
     // 3. Create OR Upsert the record
     let record;
     if (id) {
@@ -38,8 +37,8 @@ export async function POST(req: NextRequest) {
           checkpointId: checkpoint.id,
           checkpointName: checkpoint.name,
           checkpointLocation: checkpoint.location,
-          userId: actualUserId,
-          status: status || 'NORMAL',
+          userId,
+          status: status || SYSTEM_CONSTANTS.PATROL_STATUS_NORMAL,
           notes: notes || '',
           offlineId: id.toString(),
           createdAt: new Date(timestamp),
@@ -52,8 +51,8 @@ export async function POST(req: NextRequest) {
           checkpointId: checkpoint.id,
           checkpointName: checkpoint.name,
           checkpointLocation: checkpoint.location,
-          userId: actualUserId,
-          status: status || 'NORMAL',
+          userId,
+          status: status || SYSTEM_CONSTANTS.PATROL_STATUS_NORMAL,
           notes: notes || '',
           // offlineId remains null (means real-time)
           createdAt: new Date(timestamp),

@@ -124,8 +124,9 @@ export async function GET(req: NextRequest) {
 
                     let result = '未到';
                     if (record) {
-                        const diffMin = (record.createdAt.getTime() - planStart.getTime()) / 60000;
-                        result = diffMin <= (differenceInCalendarDays(planEnd, planStart) * 24 * 60) ? '准时' : '迟到';
+                        // 只要在计划时段内打卡，均视为准时
+                        const inWindow = record.createdAt >= planStart && record.createdAt <= planEnd;
+                        result = inWindow ? '准时' : '迟到';
                     }
 
                     csvRows.push([

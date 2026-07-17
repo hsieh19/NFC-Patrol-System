@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
     }
     const body = await req.json();
-    const { name, nfcTagId, location, groupId, roleCode, creatorId } = body;
+    const { name, nfcTagId, location, groupId, roleCode, creatorId, cardType } = body;
 
     if (!name || !nfcTagId || !groupId || !roleCode) {
-      return NextResponse.json({ error: 'Name, NFC Tag ID, Group ID and Role Code are required' }, { status: 400 });
+      return NextResponse.json({ error: 'Name, Tag ID, Group ID and Role Code are required' }, { status: 400 });
     }
 
     const creator = await getAuthUser(req);
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
         name: xss(name),
         nfcTagId: xss(nfcTagId),
         location: location ? xss(location) : null,
+        cardType: cardType === 'ID' ? 'ID' : 'IC',
         groupId: targetGroupId,
         roleCode,
       },

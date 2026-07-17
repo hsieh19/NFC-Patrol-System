@@ -52,7 +52,7 @@ export default function LoginPage() {
                     )
                 );
 
-                if (!isMobile && data.user.role !== 'SUPER_ADMIN' && data.user.role !== 'ADMIN') {
+                if (!isMobile && data.user.roleCode !== 'SUPER_ADMIN' && data.user.roleCode !== 'ADMIN') {
                     setError("该角色仅限于手机端打卡使用，无权访问电脑管理后台！");
                     setLoading(false);
                     return;
@@ -65,8 +65,9 @@ export default function LoginPage() {
                     id: data.user.id,
                     username: data.user.username,
                     name: data.user.name,
-                    role: data.user.role,
-                    groupId: data.user.groupId
+                    roleCode: data.user.roleCode,
+                    groupId: data.user.groupId,
+                    permissions: data.user.permissions,
                 }));
 
                 router.push("/");

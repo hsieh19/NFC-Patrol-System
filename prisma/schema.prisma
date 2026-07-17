@@ -37,6 +37,7 @@ model User {
   repairs    RepairReport[]
   group      UserGroup?     @relation(fields: [groupId], references: [id])
   role       Role           @relation(fields: [roleCode], references: [code], onDelete: SetDefault)
+  patrolWand PatrolWand?    @relation("UserWand")
 }
 
 model UserGroup {
@@ -64,6 +65,7 @@ model Checkpoint {
   location   String?
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
+  cardType   String            @default("IC") // 巡检点卡片类型，"IC" (13.56MHz) 或 "ID" (125KHz)
   groupId    String
   roleCode   String
   role       Role              @relation(fields: [roleCode], references: [code], onDelete: Cascade)
@@ -182,3 +184,20 @@ model RepairReport {
   @@index([userId, createdAt])
   @@index([status, createdAt])
 }
+
+model PatrolWand {
+  id         String     @id @default(cuid())
+  uuid       String     @unique // 巡更棒的唯一通信授权 UUID
+  name       String     // 设备名称
+  cardType   String     @default("IC") // 读卡器模式，"IC" 或 "ID"
+  ipAddress  String?    // 设备最新的局域网 IP
+  lastSeen   DateTime?  // 最新在线时间 (心跳接收时间)
+  userId     String?    @unique // 分配的人员 ID (一对一绑定)
+  shouldWakeServer Boolean @default(false) // 是否需要唤醒本地 Web 服务的标志
+  user       User?      @relation("UserWand", fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([userId])
+}
+

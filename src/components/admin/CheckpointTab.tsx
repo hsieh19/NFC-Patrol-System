@@ -8,6 +8,7 @@ interface Checkpoint {
     nfcTagId: string;
     name: string;
     location: string | null;
+    cardType: string;
     groupId: string;
     group?: { id: string, name: string };
     roleCode: string;
@@ -34,9 +35,9 @@ export default function CheckpointTab() {
     const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
-    const [newData, setNewData] = useState({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "" });
+    const [newData, setNewData] = useState({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "", cardType: "IC" });
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editData, setEditData] = useState({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "" });
+    const [editData, setEditData] = useState({ name: "", nfcTagId: "", location: "", groupId: "", roleCode: "", cardType: "IC" });
     const [groups, setGroups] = useState<Group[]>([]);
     const [roles, setRoles] = useState<Role[]>([]);
     const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
@@ -121,7 +122,7 @@ export default function CheckpointTab() {
                 body: JSON.stringify({ ...newData, creatorId: currentUser?.id }),
             });
             if (res.ok) {
-                setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "" });
+                setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "", cardType: "IC" });
                 setIsAdding(false);
                 fetchCheckpoints();
             } else {
@@ -139,6 +140,7 @@ export default function CheckpointTab() {
             name: cp.name,
             nfcTagId: cp.nfcTagId,
             location: cp.location || "",
+            cardType: cp.cardType || "IC",
             groupId: cp.groupId,
             roleCode: cp.roleCode
         });
@@ -207,15 +209,14 @@ export default function CheckpointTab() {
     };
 
     // ——— 导入逻辑 ———
-    const parseCSV = (text: string): { nfcTagId: string; name: string; location: string }[] => {
+    const parseCSV = (text: string): { nfcTagId: string; name: string; location: string; cardType: string }[] => {
         const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
-        // 跳过表头行
-        const dataLines = lines[0]?.startsWith('NFC') ? lines.slice(1) : lines;
+        // 跳过表头行 (兼容标签ID和NFC标签ID)
+        const dataLines = (lines[0]?.startsWith('NFC') || lines[0]?.startsWith('标签ID')) ? lines.slice(1) : lines;
         return dataLines.map(line => {
-            // 处理带引号的 CSV 字段
             const cols: string[] = [];
-            let cur = '';
             let inQ = false;
+            let cur = '';
             for (let i = 0; i < line.length; i++) {
                 const ch = line[i];
                 if (ch === '"') {
@@ -228,7 +229,16 @@ export default function CheckpointTab() {
                 }
             }
             cols.push(cur);
-            return { nfcTagId: (cols[0] || '').trim(), name: (cols[1] || '').trim(), location: (cols[2] || '').trim() };
+            
+            const rawType = (cols[3] || '').trim();
+            const cardType = (rawType === 'ID卡' || rawType === 'ID') ? 'ID' : 'IC';
+
+            return { 
+                nfcTagId: (cols[0] || '').trim(), 
+                name: (cols[1] || '').trim(), 
+                location: (cols[2] || '').trim(),
+                cardType
+            };
         }).filter(r => r.nfcTagId && r.name);
     };
 
@@ -325,7 +335,7 @@ export default function CheckpointTab() {
                     <button
                         onClick={() => {
                             setIsAdding(true);
-                            setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "" });
+                            setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "", cardType: "IC" });
                         }}
                         className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                     >
@@ -339,7 +349,8 @@ export default function CheckpointTab() {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="border-b border-gray-100 italic">
-                            <th className="pb-4 font-semibold text-sm text-gray-400 px-4">NFC 标签 ID</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-400 px-4">标签ID</th>
+                            <th className="pb-4 font-semibold text-sm text-gray-400 px-4">卡片类型</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">点位名称</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">物理位置</th>
                             <th className="pb-4 font-semibold text-sm text-gray-400 px-4">所属分组</th>
@@ -351,7 +362,13 @@ export default function CheckpointTab() {
                         {isAdding && (
                             <tr className="bg-blue-50/30">
                                 <td className="py-3 px-4">
-                                    <input type="text" placeholder="标签 ID (如: NFC_001)" className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={newData.nfcTagId} onChange={(e) => setNewData({ ...newData, nfcTagId: e.target.value })} />
+                                    <input type="text" placeholder="标签 ID (如: IC_001)" className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={newData.nfcTagId} onChange={(e) => setNewData({ ...newData, nfcTagId: e.target.value })} />
+                                </td>
+                                <td className="py-3 px-4">
+                                    <select className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={newData.cardType} onChange={(e) => setNewData({ ...newData, cardType: e.target.value })}>
+                                        <option value="IC">IC卡 (13.56M)</option>
+                                        <option value="ID">ID卡 (125K)</option>
+                                    </select>
                                 </td>
                                 <td className="py-3 px-4">
                                     <input type="text" placeholder="点位名称" className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={newData.name} onChange={(e) => setNewData({ ...newData, name: e.target.value })} />
@@ -373,7 +390,7 @@ export default function CheckpointTab() {
                                 </td>
                                 <td className="py-3 px-4 text-right flex justify-end gap-2">
                                     <button onClick={handleAdd} className="p-1.5 text-green-600 hover:bg-green-100 rounded text-xs"><Check className="w-4 h-4" /></button>
-                                    <button onClick={() => { setIsAdding(false); setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "" }); }} className="p-1.5 text-red-600 hover:bg-red-100 rounded text-xs"><X className="w-4 h-4" /></button>
+                                    <button onClick={() => { setIsAdding(false); setNewData({ name: "", nfcTagId: "", location: "", groupId: groups.length === 1 ? groups[0].id : "", roleCode: "", cardType: "IC" }); }} className="p-1.5 text-red-600 hover:bg-red-100 rounded text-xs"><X className="w-4 h-4" /></button>
                                 </td>
                             </tr>
                         )}
@@ -381,6 +398,12 @@ export default function CheckpointTab() {
                             editingId === cp.id ? (
                                 <tr key={cp.id} className="bg-blue-50/20 transition-colors">
                                     <td className="py-3 px-4"><input type="text" className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={editData.nfcTagId} onChange={(e) => setEditData({ ...editData, nfcTagId: e.target.value })} /></td>
+                                    <td className="py-3 px-4">
+                                        <select className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={editData.cardType} onChange={(e) => setEditData({ ...editData, cardType: e.target.value })}>
+                                            <option value="IC">IC卡</option>
+                                            <option value="ID">ID卡</option>
+                                        </select>
+                                    </td>
                                     <td className="py-3 px-4"><input type="text" className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} /></td>
                                     <td className="py-3 px-4"><input type="text" className="w-full bg-white border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={editData.location} onChange={(e) => setEditData({ ...editData, location: e.target.value })} /></td>
                                     <td className="py-3 px-4">
@@ -403,6 +426,13 @@ export default function CheckpointTab() {
                             ) : (
                                 <tr key={cp.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                                     <td className="py-4 px-4 font-mono text-gray-500">{cp.nfcTagId}</td>
+                                    <td className="py-4 px-4">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                            cp.cardType === 'ID' ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'
+                                        }`}>
+                                            {cp.cardType === 'ID' ? 'ID卡' : 'IC卡'}
+                                        </span>
+                                    </td>
                                     <td className="py-4 px-4 text-[#0f172a] font-semibold">{cp.name}</td>
                                     <td className="py-4 px-4 text-gray-500">{cp.location || "-"}</td>
                                     <td className="py-4 px-4">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { createErrorResponse } from '@/lib/api-error';
+import { getAuthUser } from '@/lib/auth';
 
 export async function PUT(req: NextRequest) {
     try {
@@ -9,6 +10,15 @@ export async function PUT(req: NextRequest) {
 
         if (!id || !oldPassword || !newPassword) {
             return NextResponse.json({ error: '参数不完整' }, { status: 400 });
+        }
+
+        // 验证调用者身份，且只能修改自己的密码
+        const authUser = await getAuthUser(req);
+        if (!authUser) {
+            return NextResponse.json({ error: '未登录' }, { status: 401 });
+        }
+        if (authUser.id !== id) {
+            return NextResponse.json({ error: '无权修改他人密码' }, { status: 403 });
         }
 
         const user = await db.user.findUnique({

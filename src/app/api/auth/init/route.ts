@@ -44,15 +44,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Verify roles exist
-    const existingRoles = await db.role.findMany();
-    console.log('Existing roles:', existingRoles.map(r => r.code));
-
-    // Check if SUPER_ADMIN role exists
-    const superAdminRole = await db.role.findUnique({ where: { code: 'SUPER_ADMIN' } });
-    console.log('SUPER_ADMIN role exists:', !!superAdminRole);
-
-    // 3. Transcations: Create admin and Mark as initialised
+    // 3. Transactions: Create admin and Mark as initialised
     await db.$transaction([
       db.user.create({
         data: {

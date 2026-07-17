@@ -27,12 +27,13 @@ export async function GET(req: NextRequest) {
         });
 
         // 生成 CSV
-        const header = 'NFC标签ID,点位名称,物理位置';
+        const header = '标签ID,点位名称,物理位置,卡片类型';
         const rows = checkpoints.map(cp =>
             [
                 cp.nfcTagId,
                 cp.name,
-                cp.location ?? ''
+                cp.location ?? '',
+                cp.cardType === 'ID' ? 'ID卡' : 'IC卡'
             ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
         );
         const csv = '\uFEFF' + [header, ...rows].join('\r\n');
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
         // 验证必填字段
         for (const row of rows) {
             if (!row.nfcTagId || !row.name) {
-                return NextResponse.json({ error: `每行必须包含 NFC标签ID 和 点位名称` }, { status: 400 });
+                return NextResponse.json({ error: `每行必须包含 标签ID 和 点位名称` }, { status: 400 });
             }
         }
 
@@ -81,10 +82,11 @@ export async function POST(req: NextRequest) {
             // 2. 批量创建新点位
             if (rows.length > 0) {
                 await tx.checkpoint.createMany({
-                    data: rows.map((row: { nfcTagId: string; name: string; location?: string }) => ({
+                    data: rows.map((row: { nfcTagId: string; name: string; location?: string; cardType?: string }) => ({
                         nfcTagId: row.nfcTagId,
                         name: row.name,
                         location: row.location || null,
+                        cardType: (row.cardType === 'ID卡' || row.cardType === 'ID') ? 'ID' : 'IC',
                         groupId,
                         roleCode
                     }))
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, imported: rows.length });
     } catch (error: unknown) {
         if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'P2002') {
-            return NextResponse.json({ error: '导入的数据中存在重复的 NFC 标签 ID，请检查后重试' }, { status: 400 });
+            return NextResponse.json({ error: '导入的数据中存在重复的标签ID，请检查后重试' }, { status: 400 });
         }
         return createErrorResponse(error, 'Failed to import checkpoints');
     }
