@@ -15,6 +15,8 @@ services:
       - JWT_SECRET=your-production-secret-key-change-it
       # 这里填写你内网 Nginx 的 HTTPS 完整访问地址
       - NEXT_PUBLIC_BASE_URL=https://patrol.internal.com
+      # 如果生产环境不使用 HTTPS，请设置为 false 以免浏览器拒绝保存安全 Cookie (token)
+      - COOKIE_SECURE=false
     # 内部只跑 HTTP
     ports:
       - "3000:3000"

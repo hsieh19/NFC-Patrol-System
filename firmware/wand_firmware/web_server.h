@@ -188,9 +188,6 @@ void handleSave() {
 
     server.send(200, "text/html; charset=utf-8", redirectHtml);
     
-    beep(100); delay(100);
-    beep(100); delay(100);
-    beep(300);
     delay(2000);
     ESP.restart();
 }
@@ -223,9 +220,6 @@ void startCaptivePortal() {
     server.begin();
     
     Serial.println("[AP配置模式] 热点开启: " + apName + ", 请访问 192.168.4.1 进行配置。");
-    
-    // 持续哔声提示进入 AP 模式
-    beep(200); delay(100); beep(200);
 
     while (true) {
         dnsServer.processNextRequest();

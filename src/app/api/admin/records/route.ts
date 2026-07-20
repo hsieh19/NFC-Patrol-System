@@ -35,18 +35,53 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const records = await db.patrolRecord.findMany({
-      where: whereClause,
-      include: {
-        user: true,
-        checkpoint: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 50,
+    const pageStr = req.nextUrl.searchParams.get('page');
+    const limitStr = req.nextUrl.searchParams.get('limit') || '20';
+
+    if (!pageStr) {
+      const records = await db.patrolRecord.findMany({
+        where: whereClause,
+        include: {
+          user: true,
+          checkpoint: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 50,
+      });
+      return NextResponse.json(records);
+    }
+
+    const page = parseInt(pageStr) || 1;
+    const limit = parseInt(limitStr) || 20;
+    const skip = (page - 1) * limit;
+
+    const [records, total] = await Promise.all([
+      db.patrolRecord.findMany({
+        where: whereClause,
+        include: {
+          user: true,
+          checkpoint: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: limit,
+      }),
+      db.patrolRecord.count({ where: whereClause })
+    ]);
+
+    return NextResponse.json({
+      records,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
     });
-    return NextResponse.json(records);
   } catch (error: unknown) {
     return createErrorResponse(error, 'Failed to fetch records');
   }

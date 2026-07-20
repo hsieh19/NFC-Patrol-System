@@ -170,7 +170,6 @@ void loop() {
             // 在连接中，不断轮询 WiFi 状态
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.println("[唤醒成功] WiFi 已建立连接，同步服务器配置与打卡数据...");
-                beep(80); // 短音提示连网成功
                 
                 sendHeartbeat();      // 同步对时/名称/卡片类型
                 syncOfflineRecords(); // 批量补传离线打卡数据

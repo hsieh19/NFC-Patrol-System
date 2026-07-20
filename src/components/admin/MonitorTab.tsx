@@ -26,12 +26,26 @@ export default function MonitorTab() {
     const [records, setRecords] = useState<Record[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchRecords = async () => {
+    // 分页状态
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [limit, setLimit] = useState(20); // 每页显示数据行数（支持自定义）
+
+    // 临时清屏状态（仅在第 1 页生效）
+    const [clearTimestamp, setClearTimestamp] = useState(0);
+    const [isCleared, setIsCleared] = useState(false);
+
+    // 拉取巡检记录数据
+    const fetchRecords = async (targetPage = page, showLoader = false, targetLimit = limit) => {
+        if (showLoader) setLoading(true);
         try {
-            const res = await fetch("/api/admin/records");
+            const res = await fetch(`/api/admin/records?page=${targetPage}&limit=${targetLimit}`);
             const data = await res.json();
-            if (Array.isArray(data)) {
-                setRecords(data);
+            if (data && Array.isArray(data.records)) {
+                setRecords(data.records);
+                if (data.pagination) {
+                    setTotalPages(data.pagination.totalPages || 1);
+                }
             } else {
                 console.error("API Error: ", data);
                 setRecords([]);
@@ -43,11 +57,28 @@ export default function MonitorTab() {
         }
     };
 
+    // 监听页码和每页显示条数的变化，加载数据
     useEffect(() => {
-        fetchRecords();
-        const timer = setInterval(fetchRecords, 10000); // 10秒刷新一次
+        fetchRecords(page, true, limit);
+    }, [page, limit]);
+
+    // 自动刷新逻辑：仅在处于“第 1 页”时，每 10 秒拉取一次最新数据
+    useEffect(() => {
+        if (page !== 1) return;
+
+        const timer = setInterval(() => {
+            fetchRecords(1, false, limit);
+        }, 10000);
+
         return () => clearInterval(timer);
-    }, []);
+    }, [page, limit]);
+
+    // 过滤渲染出来的记录 (清屏模式下，只显示清屏时刻之后新上报的记录)
+    const displayRecords = records.filter((record) => {
+        if (clearTimestamp === 0 || page !== 1) return true;
+        // 预留 2 秒缓冲时间以防服务器与客户端存在极微的时钟偏差
+        return new Date(record.createdAt).getTime() > clearTimestamp - 2000;
+    });
 
     if (loading) {
         return (
@@ -59,7 +90,52 @@ export default function MonitorTab() {
 
     return (
         <div className="bg-white rounded-2xl p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 animate-in fade-in duration-300">
-            <h2 className="text-lg font-bold text-[#0f172a] mb-6 tracking-tight">近日动态录入</h2>
+            
+            {/* 顶栏控制区域 */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-bold text-[#0f172a] tracking-tight">近日动态录入</h2>
+                    {page === 1 && !isCleared && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold border border-emerald-100">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            实时监控中
+                        </div>
+                    )}
+                    {page === 1 && isCleared && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-600 text-xs font-semibold border border-amber-100">
+                            已清屏・监听新数据
+                        </div>
+                    )}
+                </div>
+
+                {/* 清屏与恢复按钮 (仅在第一页可用) */}
+                {page === 1 && (
+                    <div>
+                        {!isCleared ? (
+                            <button
+                                onClick={() => {
+                                    setClearTimestamp(Date.now());
+                                    setIsCleared(true);
+                                }}
+                                className="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-lg transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                                title="临时清除屏幕显示的所有历史记录，新打卡数据上传时仍会实时展出"
+                            >
+                                🧹 清除屏幕
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    setClearTimestamp(0);
+                                    setIsCleared(false);
+                                }}
+                                className="px-4 py-2 text-sm font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100/80 border border-blue-100 hover:border-blue-200 rounded-lg transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                            >
+                                🔄 恢复显示
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
 
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[900px]">
@@ -75,12 +151,14 @@ export default function MonitorTab() {
                         </tr>
                     </thead>
                     <tbody className="text-sm">
-                        {records.length === 0 ? (
+                        {displayRecords.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="py-10 text-center text-gray-400">暂无打卡记录</td>
+                                <td colSpan={7} className="py-12 text-center text-gray-400 font-medium">
+                                    {isCleared ? "🧹 屏幕已清空，正在等待实时打卡上传..." : "暂无打卡记录"}
+                                </td>
                             </tr>
                         ) : (
-                            records.map((record) => (
+                            displayRecords.map((record) => (
                                 <tr key={record.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                                     <td className="py-4 px-4 text-gray-600 font-medium">
                                         {format(new Date(record.createdAt), "MM-dd HH:mm:ss", { locale: zhCN })}
@@ -119,6 +197,60 @@ export default function MonitorTab() {
                     </tbody>
                 </table>
             </div>
+
+            {/* 分页与自定义行数控制器 */}
+            {records.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between border-t border-gray-100 pt-6 mt-6 gap-4">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 font-semibold tracking-wide">
+                        <span>当前第 {page} 页 / 共 {totalPages} 页</span>
+                        <div className="flex items-center gap-1.5">
+                            <span>每页显示</span>
+                            <select
+                                value={limit}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setLimit(val);
+                                    setPage(1); // 更改每页条数时重置到第一页
+                                    setClearTimestamp(0); // 更改每页条数时重置清屏状态
+                                    setIsCleared(false);
+                                }}
+                                className="bg-gray-50 hover:bg-gray-100/80 border border-gray-200 rounded px-2 py-1 font-bold text-gray-700 outline-none focus:border-blue-500 transition-all cursor-pointer shadow-sm"
+                            >
+                                <option value={10}>10 行</option>
+                                <option value={20}>20 行</option>
+                                <option value={50}>50 行</option>
+                                <option value={100}>100 行</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <button
+                            disabled={page <= 1}
+                            onClick={() => {
+                                setPage((p) => Math.max(p - 1, 1));
+                                setClearTimestamp(0);
+                                setIsCleared(false);
+                            }}
+                            className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            上一页
+                        </button>
+                        <button
+                            disabled={page >= totalPages}
+                            onClick={() => {
+                                setPage((p) => Math.min(p + 1, totalPages));
+                                setClearTimestamp(0);
+                                setIsCleared(false);
+                            }}
+                            className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            下一页
+                        </button>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

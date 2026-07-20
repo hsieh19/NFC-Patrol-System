@@ -37,9 +37,6 @@ bool uploadSingleRecord(String cardId, unsigned long long ts) {
                 if ((serverMode == "IC" || serverMode == "ID") && serverMode != cardType) {
                     Serial.println("[配置变更] 实时打卡响应中发现工作模式变更: " + cardType + " -> " + serverMode + "，设备正在保存并重启...");
                     preferences.putString("mode", serverMode);
-                    beep(100); delay(80);
-                    beep(100); delay(80);
-                    beep(500);
                     delay(1000);
                     ESP.restart();
                 }
@@ -107,9 +104,6 @@ void sendHeartbeat() {
                 if ((serverMode == "IC" || serverMode == "ID") && serverMode != cardType) {
                     Serial.println("[配置变更] 服务端更改了读卡工作模式: " + cardType + " -> " + serverMode + "，设备将在写入 NVS 后自动重启！");
                     preferences.putString("mode", serverMode);
-                    beep(100); delay(80);
-                    beep(100); delay(80);
-                    beep(500); 
                     delay(1000);
                     ESP.restart();
                 }
@@ -122,11 +116,6 @@ void sendHeartbeat() {
             Serial.println("[远程唤醒] 收到服务端唤醒指令！正在启用配置网页...");
             startWebServerSTA();
             lastHttpActivityTime = millis(); // 重置保活计时器 (3分钟调试期)
-            
-            // 鸣笛三声提示已唤醒
-            beep(100); delay(80);
-            beep(100); delay(80);
-            beep(100);
         }
     } else {
         Serial.printf("[心跳异常] 发送失败, HTTP 状态码: %d\n", code);
@@ -187,7 +176,6 @@ void syncOfflineRecords() {
     if (code == 200) {
         Serial.println("[同步成功] 服务端已成功保存，清空本地离线缓存。");
         LittleFS.remove("/offline_records.txt");
-        beep(100); delay(80); beep(100); // 嘀嘀双声
     } else {
         Serial.printf("[同步失败] 接口返回状态码: %d，保留本地缓存以待重试。\n", code);
     }

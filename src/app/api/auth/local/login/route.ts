@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       maxAge: 86400, // 24 hours
       sameSite: 'lax',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.NODE_ENV === 'production' && process.env.COOKIE_SECURE !== 'false',
     });
 
     return response;

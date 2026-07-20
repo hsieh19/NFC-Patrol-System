@@ -1,0 +1,44 @@
+# Dependency & build directories
+node_modules/
+.next/
+.nextbuildinfo
+tsconfig.tsbuildinfo
+out/
+dist/
+build/
+.turbo/
+
+# Git & Editor configs
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+.gemini/
+.agents/
+.cursorrules
+
+# Local database & env files
+.env
+.env*.local
+*.db
+*.db-journal
+prisma/dev.db
+prisma/dev.db-journal
+
+# Documentation & tests
+docs/
+CHANGELOG.md
+README.md
+vitest.config.ts
+
+# Hardware firmware (Not needed in Next.js runner)
+firmware/
+
+# Temporary & log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+logs/
+*.log
