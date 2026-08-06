@@ -1,0 +1,226 @@
+# ============================================================
+# AnyFlash 通用固件发布工作流 - NFC-Patrol-System 巡更棒固件
+# ============================================================
+#
+# 使用说明：
+# 1. 在固件仓库的 Settings -> Secrets and variables -> Actions 中，
+#    配置以下 4 个 R2 访问密钥：
+#    - R2_ACCESS_KEY_ID     : 您的 Cloudflare R2 API Access Key ID
+#    - R2_SECRET_ACCESS_KEY : 您的 Cloudflare R2 API Secret Access Key
+#    - R2_ACCOUNT_ID        : 您的 Cloudflare 账户 ID
+#    - R2_BUCKET            : 您的 R2 存储桶名称 (如 github-release-mirror)
+#
+# 触发方式：当推送代码至 main/master 分支，且 firmware/wand_firmware/config.h
+#          中的 FIRMWARE_VERSION 发生改变时，自动触发编译与 AnyFlash 云端发布。
+# ============================================================
+
+name: Build & Publish Firmware to R2
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'firmware/wand_firmware/config.h'
+
+jobs:
+  build-and-deploy:
+    name: 编译固件并发布到 Cloudflare R2
+    runs-on: ubuntu-latest
+
+    env:
+      # 项目唯一标识符 (对应 AnyFlash 平台目录名)
+      PROJECT_ID: "patrol_wand"
+      # 项目展示名称
+      PROJECT_NAME: "巡更棒固件"
+      # 项目功能描述
+      PROJECT_DESC: "数字化智能巡更系统 - ESP32-C3 巡更棒主控固件，支持 IC/ID 双模读卡、离线打卡数据缓存、本地 Web 管理及手动 OTA 升级功能。"
+      # 目标芯片平台目录名
+      CHIP_PLATFORM: "ESP32C3"
+      # Arduino CLI 编译 FQBN (CDCOnBoot=default 用以兼容 ESP32-C3 简约版脱机假死缺陷)
+      FQBN: "esp32:esp32:esp32c3:CDCOnBoot=default,FlashMode=dio,FlashSize=4M,PartitionScheme=min_spiffs"
+      # Arduino .ino 主工程入口文件路径 (相对于仓库根目录)
+      SKETCH_PATH: "firmware/wand_firmware/wand_firmware.ino"
+      # esptool merge_bin 合包参数
+      FLASH_CHIP: "esp32c3"
+      FLASH_MODE: "dio"
+      FLASH_SIZE: "4MB"
+      FLASH_FREQ: "40m"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # 拉取最近的 2 次提交以用于版本比对
+
+      - name: Check Version Change
+        id: check_version
+        run: |
+          # 提取当前提交的版本号
+          CUR_VER=$(grep -E '#define[[:space:]]+FIRMWARE_VERSION' firmware/wand_firmware/config.h | awk -F'"' '{print $2}')
+          echo "当前提交版本号: $CUR_VER"
+          
+          # 提取前一次提交的版本号
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            PREV_VER=$(git show HEAD~1:firmware/wand_firmware/config.h | grep -E '#define[[:space:]]+FIRMWARE_VERSION' | awk -F'"' '{print $2}')
+            echo "上一次提交版本号: $PREV_VER"
+          else
+            PREV_VER=""
+            echo "未检测到前一次提交记录，视作首次发布。"
+          fi
+          
+          # 规范化版本号格式 (若无 'v' 前缀则自动补上)
+          if [ -n "$CUR_VER" ]; then
+            if [[ ! "$CUR_VER" =~ ^v ]]; then
+              CUR_VER="v$CUR_VER"
+            fi
+          fi
+          if [ -n "$PREV_VER" ]; then
+            if [[ ! "$PREV_VER" =~ ^v ]]; then
+              PREV_VER="v$PREV_VER"
+            fi
+          fi
+          
+          if [ "$CUR_VER" != "$PREV_VER" ] && [ -n "$CUR_VER" ]; then
+            echo "检测到版本号已发生变更: $PREV_VER -> $CUR_VER"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+            echo "VERSION=$CUR_VER" >> $GITHUB_OUTPUT
+          else
+            echo "版本号未发生变更，本次推送跳过固件分发与编译。"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+        if: steps.check_version.outputs.version_changed == 'true'
+
+      - name: Install ESP32 Platform (locked to 2.0.14)
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          arduino-cli core update-index
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core install esp32:esp32@2.0.14 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+      # 安装项目所依赖的第三方 Arduino 库
+      - name: Install Libraries
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          arduino-cli lib install "MFRC522"
+          arduino-cli lib install "ArduinoJson"
+
+      - name: Compile Firmware
+        if: steps.check_version.outputs.version_changed == 'true'
+        run: |
+          arduino-cli compile \
+            --fqbn "$FQBN" \
+            --output-dir ./build \
+            "$SKETCH_PATH"
+        env:
+          FQBN: ${{ env.FQBN }}
+          SKETCH_PATH: ${{ env.SKETCH_PATH }}
+
+      - name: Prepare R2 Directory Structure
+        if: steps.check_version.outputs.version_changed == 'true'
+        env:
+          VERSION: ${{ steps.check_version.outputs.VERSION }}
+          PROJECT_ID: ${{ env.PROJECT_ID }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+          PROJECT_DESC: ${{ env.PROJECT_DESC }}
+          CHIP_PLATFORM: ${{ env.CHIP_PLATFORM }}
+          FLASH_CHIP: ${{ env.FLASH_CHIP }}
+          FLASH_MODE: ${{ env.FLASH_MODE }}
+          FLASH_SIZE: ${{ env.FLASH_SIZE }}
+          FLASH_FREQ: ${{ env.FLASH_FREQ }}
+        run: |
+          rm -rf out
+          OTA_DIR="out/Firmware/OTA Updates/${CHIP_PLATFORM}"
+          FULL_DIR="out/Firmware/Full Firmware Packages/${CHIP_PLATFORM}"
+          mkdir -p "$OTA_DIR" "$FULL_DIR"
+
+          # 1. 生成 project.json (供 AnyFlash Worker 动态扫描注册此项目)
+          python3 -c "
+          import json
+          data = {'id': '${PROJECT_ID}', 'name': '${PROJECT_NAME}', 'description': '${PROJECT_DESC}'}
+          print(json.dumps(data, indent=2, ensure_ascii=False))
+          " > out/project.json
+
+          # 2. 合并全量固件包 (供 AnyFlash 网页控制端通过 Web Serial 从偏移地址 0x0 烧录)
+          pip install esptool --quiet
+          FULL_BIN_NAME="${PROJECT_ID}_Full_${VERSION}.bin"
+          esptool.py --chip "${FLASH_CHIP}" merge_bin \
+            -o "${FULL_DIR}/${FULL_BIN_NAME}" \
+            --flash_mode "${FLASH_MODE}" \
+            --flash_size "${FLASH_SIZE}" \
+            --flash_freq "${FLASH_FREQ}" \
+            0x0     ./build/*.bootloader.bin \
+            0x8000  ./build/*.partitions.bin \
+            0x10000 ./build/*.bin
+
+          # 3. 生成 Full Firmware manifest.json (AnyFlash 烧录网页读取版本校验信息)
+          FULL_MD5=$(md5sum "${FULL_DIR}/${FULL_BIN_NAME}" | cut -d ' ' -f 1)
+          RELEASE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          python3 -c "
+          import json
+          data = {
+            'version': '${VERSION}',
+            'filename': '${FULL_BIN_NAME}',
+            'md5': '${FULL_MD5}',
+            'release_time': '${RELEASE_TIME}'
+          }
+          print(json.dumps(data, indent=2))
+          " > "${FULL_DIR}/manifest.json"
+          echo "-> Full manifest: ${FULL_DIR}/manifest.json"
+
+          # 4. 复制 OTA 固件包 (AnyFlash 云端升级分发)
+          OTA_BIN_NAME="${PROJECT_ID}_OTA_${VERSION}.bin"
+          cp ./build/*.bin "${OTA_DIR}/${OTA_BIN_NAME}"
+
+          # 5. 提取 CHANGELOG 并生成 OTA manifest.json (Worker /api/ota/check 读取)
+          RELEASE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          OTA_MD5=$(md5sum "${OTA_DIR}/${OTA_BIN_NAME}" | cut -d ' ' -f 1)
+          if [ -f "firmware/CHANGELOG.md" ]; then
+            awk "/## \[${VERSION}\]/{flag=1;next}/## \[/{flag=0}flag" firmware/CHANGELOG.md > temp_changelog.txt
+            CHANGELOG_JSON=$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().strip()))' < temp_changelog.txt)
+          else
+            CHANGELOG_JSON='""'
+          fi
+          python3 -c "
+          import json, sys
+          changelog = ${CHANGELOG_JSON}
+          data = {
+            'version': '${VERSION}',
+            'filename': '${OTA_BIN_NAME}',
+            'md5': '${OTA_MD5}',
+            'release_time': '${RELEASE_TIME}',
+            'changelog': changelog
+          }
+          print(json.dumps(data, indent=2))
+          " > "${OTA_DIR}/manifest.json"
+          echo "-> OTA manifest: ${OTA_DIR}/manifest.json"
+
+      - name: Upload to Cloudflare R2
+        uses: jakejarvis/s3-sync-action@master
+        if: steps.check_version.outputs.version_changed == 'true'
+        with:
+          args: --follow-symlinks
+        env:
+          AWS_S3_BUCKET: ${{ secrets.R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_S3_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_REGION: auto
+          SOURCE_DIR: "./out"
+          DEST_DIR: ${{ env.PROJECT_ID }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: steps.check_version.outputs.version_changed == 'true'
+        with:
+          tag_name: ${{ steps.check_version.outputs.VERSION }}
+          name: Release ${{ steps.check_version.outputs.VERSION }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: |
+            out/Firmware/Full Firmware Packages/${{ env.CHIP_PLATFORM }}/*.bin
+            out/Firmware/OTA Updates/${{ env.CHIP_PLATFORM }}/*.bin

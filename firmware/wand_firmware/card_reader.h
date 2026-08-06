@@ -10,12 +10,18 @@
 // 单模读卡硬件初始化
 // ==========================================
 void initRC522() {
+    // RC522_RST 需要设置为输出模式，并确保处于高电平 (Hard Power-Up 状态)
+    pinMode(RC522_RST, OUTPUT);
+    digitalWrite(RC522_RST, HIGH);
+    delay(50); // 等待晶振稳定
     SPI.begin(RC522_SCK, RC522_MISO, RC522_MOSI, RC522_CS);
     mfrc522.PCD_Init();
     Serial.println("[初始化成功] MFRC522 (IC卡 13.56MHz) 已加载。");
 }
 
 void initRDM6300() {
+    // 通过 AO3400 MOSFET 上电 RDM6300
+    rdmPowerOn(); // 拉高 GPIO10，MOSFET 导通，RDM6300 接通 GND 回路
     rdmSerial.begin(9600, SERIAL_8N1, RDM6300_RX, -1);
     Serial.println("[初始化成功] RDM6300 (ID卡 125KHz) 串口监听已就绪。");
 }

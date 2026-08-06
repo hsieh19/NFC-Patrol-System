@@ -48,7 +48,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./server
           push: true
           build-args: |
             DB_TYPE=${{ matrix.db_type }}

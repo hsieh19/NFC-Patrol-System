@@ -4,6 +4,7 @@
 #include "config.h"
 #include "utils.h"
 #include "storage.h"
+#include "low_power.h"
 
 // 前置声明外部 Web 状态服务器开启函数 (在 web_server.h 中定义)，避免循环引用
 extern void startWebServerSTA();
@@ -78,6 +79,7 @@ void sendHeartbeat() {
             timeStr.trim();
             unsigned long long serverTime = strtoull(timeStr.c_str(), NULL, 10);
             syncLocalTime(serverTime);
+            persistTimeRef(); // 持久化时间基准至 RTC 内存，供 Deep Sleep 后推算
         }
 
         // 简易解析 JSON 中的 wandName (设备名称)
@@ -116,6 +118,41 @@ void sendHeartbeat() {
             Serial.println("[远程唤醒] 收到服务端唤醒指令！正在启用配置网页...");
             startWebServerSTA();
             lastHttpActivityTime = millis(); // 重置保活计时器 (3分钟调试期)
+        }
+
+        // 简易解析 JSON 中的 sleepInterval (后端动态调整心跳间隔)
+        int sleepIdx = response.indexOf("\"sleepInterval\":");
+        if (sleepIdx != -1) {
+            String sleepStr = response.substring(sleepIdx + 16);
+            int endIdx = sleepStr.indexOf(",");
+            if (endIdx == -1) endIdx = sleepStr.indexOf("}");
+            if (endIdx != -1) sleepStr = sleepStr.substring(0, endIdx);
+            sleepStr.trim();
+            int newInterval = sleepStr.toInt();
+            if (newInterval >= 60 && newInterval <= 3600) { // 合法范围: 1分钟 ~ 1小时
+                dynamicSleepIntervalSec = newInterval;
+                Serial.printf("[心跳间隔] 后端设置下一次心跳间隔为: %d 秒\n", dynamicSleepIntervalSec);
+            }
+        }
+
+        // 简易解析 JSON 中的 patrolDuration (计划巡检指令)
+        int patrolIdx = response.indexOf("\"patrolDuration\":");
+        if (patrolIdx != -1) {
+            String durStr = response.substring(patrolIdx + 17);
+            int endIdx = durStr.indexOf(",");
+            if (endIdx == -1) endIdx = durStr.indexOf("}");
+            if (endIdx != -1) durStr = durStr.substring(0, endIdx);
+            durStr.trim();
+            int durationSec = durStr.toInt();
+            if (durationSec > 0 && !isPatrolActive) {
+                Serial.printf("[巡检计划] 收到巡检指令，巡检时长: %d 秒\n", durationSec);
+                isPatrolActive = true;
+                patrolStartMs  = millis();
+                patrolDurationMs = (unsigned long)durationSec * 1000UL;
+                // 蜂鸣器急促响 3 声，提醒用户巡检开始
+                beep(200); delay(100); beep(200); delay(100); beep(400);
+                Serial.println("[巡检开始] 蜂鸣器已提醒，进入巡检工作状态。");
+            }
         }
     } else {
         Serial.printf("[心跳异常] 发送失败, HTTP 状态码: %d\n", code);
