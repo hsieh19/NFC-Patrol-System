@@ -23,6 +23,7 @@ on:
       - master
     paths:
       - 'firmware/wand_firmware/config.h'
+  workflow_dispatch: # 允许在 GitHub 界面手动触发工作流
 
 jobs:
   build-and-deploy:
