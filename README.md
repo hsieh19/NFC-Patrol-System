@@ -40,26 +40,24 @@
 ## 📂 核心代码目录结构
 
 ```text
-src/
-├── app/                  # Next.js 核心路由层
-│   ├── admin/            # [PC] 企业管理总台 (Monitor, Checkpoint, Plan, Users)
-│   ├── mobile/           # [App] 巡更作业端 
-│   ├── api/              # 后端核心微服务 API
-│   │   ├── admin/        # 管理 CRUD (用户、计划、点位、记录、考核分析)
-│   │   ├── auth/         # 登录鉴权、系统初始化、状态检查
-│   │   └── patrol/       # 巡更核心上传逻辑 (支持实时/补传)
-│   └── middleware.ts     # Edge 层设备分流路由与全局 JWT 校验
-├── components/           # UI 组件池
-│   ├── admin/            # 管理后台功能模块组件
-│   └── ui/               # 基础颗粒组件 (基于 shadcn/ui + Tailwind v4)
-├── hooks/                # 自定义 Hooks (useSync 离线同步等)
-├── lib/                  # 基础设施类库与常量
-│   ├── auth.ts           # JWT 服务端核查验签库 
-│   ├── constants.ts      # 中心化系统常量与初始角色定义
-│   ├── db.ts             # Prisma Database Client (双轨 DB 支持)
-│   └── offline-db.ts     # Mobile Dexie.js 离线数据库
-├── prisma/               # Prisma 数据库 Schema 定义
-└── firmware/             # ESP32-C3 智能巡更棒多文件固件源码 (C++/Arduino)
+NFC-Patrol-System/
+├── firmware/                 # 智能巡更棒固件 (ESP32-C3)
+│   ├── wand_firmware/        # Arduino/C++ 固件源码
+│   └── CHANGELOG.md          # 固件更新日志
+└── server/                   # 全栈 Web 业务系统 (Next.js 16)
+    ├── prisma/               # Prisma 数据库 Schema 与数据库接口
+    ├── src/                  # Next.js 源码层
+    │   ├── app/              # 核心路由层 (App Router)
+    │   │   ├── admin/        # [PC] 企业管理总台 (Monitor, Checkpoint, Plan, Users)
+    │   │   ├── mobile/       # [App] 移动巡更作业端
+    │   │   ├── api/          # 后端核心 API (含巡更棒接口 /api/patrol/...)
+    │   │   └── middleware.ts # 统一设备分流与 JWT 鉴权中间件
+    │   ├── components/       # UI 组件池
+    │   ├── hooks/            # React 自定义 Hooks (含 IndexedDB 同步逻辑)
+    │   └── lib/              # 工具函数、常数项与底层 DB Client
+    ├── Dockerfile            # 生产环境容器化构建配置
+    ├── package.json          # Node.js 项目配置与依赖说明
+    └── tsconfig.json         # TypeScript 编译配置
 ```
 
 ---
@@ -81,39 +79,51 @@ src/
 ## 🚀 部署与极速启动
 
 ### 1. 环境准备
-确保本机或服务器已安装 `Node.js 18+`。
+确保本机或服务器已安装 `Node.js 18+`，并且已安装 **Arduino IDE**（用以编译巡更棒固件）。
 
 ### 2. 下载与配置
-克隆代码库并根据样本文件创建环境变量：
+克隆代码库，进入 `server/` 文件夹中并根据样本文件创建环境变量：
 ```bash
+cd server
 cp .env.example .env
 ```
 在 `.env` 中修改 `DB_TYPE` (`sqlite` 或 `mysql`)。若使用 MySQL，请配置相应的 `MYSQL_HOST` 等参数。
 
-### 3. 安装与运行
+### 3. 全栈服务安装与运行
+所有 Next.js 服务命令都必须在 `server/` 目录下执行：
 ```bash
-# 1. 安装依赖
+# 1. 进入 server 目录
+cd server
+
+# 2. 安装依赖
 npm install
 
-# 2. 运行初始化脚本 (包含数据库迁移与 Prisma Client 生成)
+# 3. 运行系统启动与开发服务器 (此脚本会自动执行数据库迁移与 Prisma Client 生成)
 npm run dev
 
-# 3. 访问系统
-# - 首次访问会自动重定向至 /init 进行系统初始化
-# - 正常登录请访问 /login
+# 4. (可选) 运行 HTTPS 模式开发服务器 (推荐用于移动端真机 NFC 调试)
+npm run dev:https
 ```
+**系统访问**：
+- 首次访问会自动重定向至 `/init` 进行超级管理员账号和系统初始化。
+- 正常登录请访问 `/login`。
 
-### 生产构建 (Bare Metal)
+#### 生产构建 (Bare Metal)
+在 `server/` 目录下运行：
 ```bash
 npm run build
 npm run start
 ```
 
-### 4. 巡更棒固件编译与烧录指引
-固件位于 [firmware/wand_firmware/](file:///e:/AI%20Project/NFC-Patrol-System/firmware/wand_firmware) 文件夹中。
-- **环境搭建**：使用 **Arduino IDE**。请通过“库管理器”搜索并安装 **`MFRC522`** 读卡器驱动库。
-- **分区配置（重要）**：
-  在 `Tools` -> `Partition Scheme` 中必须选择：**`Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)`**（或在部分板型上简称 `Minimal OTA`）。这能确保固件拥有充裕的 APP 双 OTA 槽位，并留出 LittleFS 离线记录存储扇区。
+### 4. 智能巡更棒固件编译与烧录指引
+固件源码位于根目录的 [firmware/wand_firmware/](file:///e:/AI%20Project/NFC-Patrol-System/firmware/wand_firmware) 文件夹中。
+- **环境搭建**：使用 **Arduino IDE**。请通过“库管理器”搜索并安装以下依赖库：
+  - **`MFRC522`** (IC卡 13.56MHz 驱动库)
+  - **`ArduinoJson`** (JSON 解析与序列化库，推荐 7.x 版本)
+- **分区配置 (重要)**：
+  在 `Tools` -> `Partition Scheme` 中必须选择：**`Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)`**（在部分 ESP32 开发板上被称为 `Minimal OTA`）。这能确保固件拥有充裕的 APP 双 OTA 槽位，并留出 LittleFS 本地离线打卡数据存储扇区。
+- **低功耗心跳模式说明**：
+  新版固件支持低功耗心跳管理，可以在 Web 配置页中的 **配置/升级 (Tabs)** 页独立开关 `"low_power"` 省电模式。开启后平时自动处于微安级 Deep Sleep 定时唤醒，仅在后台安排的巡更计划期间（及前 15 分钟准备期）保持持续唤醒读卡状态。
 
 ---
 
