@@ -29,6 +29,8 @@ jobs:
   build-and-deploy:
     name: 编译固件并发布到 Cloudflare R2
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     env:
       # 项目唯一标识符 (对应 AnyFlash 平台目录名)
