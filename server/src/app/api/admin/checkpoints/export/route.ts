@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { createErrorResponse } from '@/lib/api-error';
 import { checkPermission } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/checkpoints/export?groupId=xxx&roleCode=xxx
  * 导出指定分组+角色的巡检点为 CSV
@@ -42,7 +44,10 @@ export async function GET(req: NextRequest) {
             status: 200,
             headers: {
                 'Content-Type': 'text/csv; charset=utf-8',
-                'Content-Disposition': `attachment; filename="checkpoints_export.csv"`
+                'Content-Disposition': `attachment; filename="checkpoints_export.csv"`,
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
             }
         });
     } catch (error: unknown) {

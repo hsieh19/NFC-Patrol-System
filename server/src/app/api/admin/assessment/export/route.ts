@@ -5,6 +5,8 @@ import { parse, format, addDays, eachDayOfInterval, differenceInCalendarDays } f
 import { checkPermission } from '@/lib/auth';
 import { fetchPatrolRecordsByDateRange } from '@/lib/record-utils';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/assessment/export
  * 导出考核结果为 CSV
@@ -114,7 +116,7 @@ export async function GET(req: NextRequest) {
 
                 const planCheckpointIds = plan.route.checkpoints.map(cp => cp.checkpointId);
 
-                // 每个巡检点一行
+                // 每个巡检点行
                 for (const rcp of plan.route.checkpoints) {
                     const cpRecords = recordsByCheckpoint[rcp.checkpointId] || [];
                     const record = cpRecords.find(r => r.createdAt >= planStart && r.createdAt <= planEnd);
@@ -151,7 +153,10 @@ export async function GET(req: NextRequest) {
             status: 200,
             headers: {
                 'Content-Type': 'text/csv; charset=utf-8',
-                'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`
+                'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
             }
         });
     } catch (error: unknown) {

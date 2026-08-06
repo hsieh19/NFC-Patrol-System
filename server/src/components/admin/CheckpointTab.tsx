@@ -185,7 +185,9 @@ export default function CheckpointTab() {
         setIeLoading(true);
         setIeMsg(null);
         try {
-            const res = await fetch(`/api/admin/checkpoints/export?groupId=${ieGroupId}&roleCode=${ieRoleCode}`);
+            const res = await fetch(`/api/admin/checkpoints/export?groupId=${ieGroupId}&roleCode=${ieRoleCode}&_t=${Date.now()}`, {
+                cache: 'no-store'
+            });
             if (!res.ok) {
                 const err = await res.json();
                 setIeMsg({ type: 'error', text: err.error || '导出失败' });
@@ -254,7 +256,11 @@ export default function CheckpointTab() {
         setIeLoading(true);
         setIeMsg(null);
         try {
-            const text = await ieFile.text();
+            const buffer = await ieFile.arrayBuffer();
+            let text = new TextDecoder('utf-8').decode(buffer);
+            if (text.includes('\uFFFD')) {
+                text = new TextDecoder('gbk').decode(buffer);
+            }
             const rows = parseCSV(text);
             if (rows.length === 0) {
                 setIeMsg({ type: 'error', text: 'CSV 文件为空或格式不正确' });

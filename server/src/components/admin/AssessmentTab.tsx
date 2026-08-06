@@ -138,8 +138,10 @@ export default function AssessmentTab() {
         setExportLoading(true);
         setExportMsg(null);
         try {
-            const url = `/api/admin/assessment/export?startDate=${startDate}&endDate=${endDate}&groupId=${exportGroupId}&roleCode=${exportRoleCode}`;
-            const res = await fetch(url);
+            const url = `/api/admin/assessment/export?startDate=${startDate}&endDate=${endDate}&groupId=${exportGroupId}&roleCode=${exportRoleCode}&_t=${Date.now()}`;
+            const res = await fetch(url, {
+                cache: 'no-store'
+            });
             if (!res.ok) {
                 const err = await res.json();
                 setExportMsg({ type: 'error', text: err.error || '导出失败' });
