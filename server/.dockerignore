@@ -26,11 +26,18 @@ build/
 prisma/dev.db
 prisma/dev.db-journal
 
-# Documentation & tests
+# Documentation, tests & dev tools
 docs/
 CHANGELOG.md
 README.md
 vitest.config.ts
+docker-compose.yml
+components.json
+certificates/
+src/**/*.test.ts
+src/**/*.test.tsx
+src/**/*.spec.ts
+src/**/*.spec.tsx
 
 # Hardware firmware (Not needed in Next.js runner)
 firmware/
