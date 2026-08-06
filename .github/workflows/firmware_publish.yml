@@ -57,6 +57,8 @@ jobs:
 
       - name: Check Version Change
         id: check_version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           # 提取当前提交的版本号
           CUR_VER=$(grep -E '#define[[:space:]]+FIRMWARE_VERSION' firmware/wand_firmware/config.h | awk -F'"' '{print $2}')
@@ -83,7 +85,11 @@ jobs:
             fi
           fi
           
-          if [ "$CUR_VER" != "$PREV_VER" ] && [ -n "$CUR_VER" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "手动触发工作流，强制执行编译与发布。"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+            echo "VERSION=$CUR_VER" >> $GITHUB_OUTPUT
+          elif [ "$CUR_VER" != "$PREV_VER" ] && [ -n "$CUR_VER" ]; then
             echo "检测到版本号已发生变更: $PREV_VER -> $CUR_VER"
             echo "version_changed=true" >> $GITHUB_OUTPUT
             echo "VERSION=$CUR_VER" >> $GITHUB_OUTPUT

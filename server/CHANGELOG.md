@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-08-06
+
+本版本为 **项目结构重构与跨平台编译修复里程碑版本**。主要完成了项目 Monorepo 目录调整、GitHub 工作流跨平台编译 Bug 修复、开发环境 HTTPS 联调支持等。
+
+### ✨ 核心功能 (Core Features)
+
+#### 1. 项目结构重构与跨平台编译修复 (Monorepo Layout & Cross-Platform CI Fixes)
+- **多模块分流**：将项目整理为 `/server`（全栈 Web 与 API 业务）和 `/firmware`（ESP32-C3 巡更棒固件）的并列多模块结构，使主库结构更加整洁。
+- **BOM 编码问题修复**：清除了 `web_server.h` 顶部的 UTF-8 BOM 字符，彻底解决 Linux/Ubuntu 运行环境下 GitHub Actions 编译时因字符编码导致的条件编译失效与 `#endif without #if` 致命错误。
+
+#### 2. 工作流易用性优化 (CI/CD Workflows)
+- **手动触发支持**：升级 `.github/workflows/firmware_publish.yml`，在触发条件中加入 `workflow_dispatch` 允许在 GitHub Web 界面上手动触发固件编译。
+- **手动强制构建**：重写了版本判定脚本，使得手动触发时可以强制越过“版本未变更”的跳过限制，直接拉起 Arduino CLI 构建、打包并推送至 Cloudflare R2，极大方便了固件的调试分发。
+- **日志提取路径更新**：修复了 `docker-publish.yml` 中的发布日志提取路径，自动适配从新子目录 `server/CHANGELOG.md` 获取变更信息。
+
+#### 3. 文档与本地开发工具升级 (Developer Experience & README)
+- **新版 README 编写**：更新了系统根目录的 `README.md` 指南，重写了目录指引及本地极速部署指令。
+- **本地 HTTPS 调试支持**：在 `server/package.json` 中加入了 `npm run dev:https` 开发指令推荐，支持在本地拉起 Next.js 的 HTTPS 开发服务器，极大简化了移动端浏览器及 PWA 进行 Web NFC 打卡功能联调的难度。
+
 ## [0.3.1] - 2026-07-20
 
 本版本聚焦于 **生产环境网络容错优化与实时监控体验升级**。解决了局域网 HTTP 部署环境下安全 Cookie 导致的登录阻断问题，重构了管理后台的实时监控模块以支持大数据量的过滤与分页展示，并精简了硬件巡更棒的提示音系统。
