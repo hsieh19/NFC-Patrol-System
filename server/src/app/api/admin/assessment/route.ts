@@ -13,11 +13,19 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
 
         const dateParam = searchParams.get('date');
-        const startDateStr = searchParams.get('startDate') || dateParam || format(new Date(), 'yyyy-MM-dd');
-        const endDateStr = searchParams.get('endDate') || dateParam || format(new Date(), 'yyyy-MM-dd');
+        const getBeijingTodayStr = () => {
+            const now = new Date();
+            const utc = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+            const beijingTime = new Date(utc + 8 * 60 * 60 * 1000);
+            return format(beijingTime, 'yyyy-MM-dd');
+        };
+        const startDateStr = searchParams.get('startDate') || dateParam || getBeijingTodayStr();
+        const endDateStr = searchParams.get('endDate') || dateParam || getBeijingTodayStr();
 
-        const startDate = parse(startDateStr, 'yyyy-MM-dd', new Date());
-        const endDate = parse(endDateStr, 'yyyy-MM-dd', new Date());
+        const [sYear, sMonth, sDay] = startDateStr.split('-').map(Number);
+        const [eYear, eMonth, eDay] = endDateStr.split('-').map(Number);
+        const startDate = new Date(Date.UTC(sYear, sMonth - 1, sDay));
+        const endDate = new Date(Date.UTC(eYear, eMonth - 1, eDay));
 
         if (differenceInCalendarDays(endDate, startDate) > 31 || endDate < startDate) {
             return NextResponse.json({ error: '日期范围不合法，最长支持31天' }, { status: 400 });
@@ -43,10 +51,8 @@ export async function GET(req: NextRequest) {
 
         // 批量拉取范围内所有相关巡检记录（整个范围一次性查询）
         const allCheckpointIds = [...new Set(plans.flatMap(p => p.route.checkpoints.map(cp => cp.checkpointId)))];
-        const rangeWindowStart = new Date(startDate);
-        rangeWindowStart.setHours(0, 0, 0, 0);
-        const rangeWindowEnd = new Date(endDate);
-        rangeWindowEnd.setHours(23, 59, 59, 999);
+        const rangeWindowStart = new Date(`${startDateStr}T00:00:00+08:00`);
+        const rangeWindowEnd = new Date(`${endDateStr}T23:59:59.999+08:00`);
 
         const allRecords = await fetchPatrolRecordsByDateRange(
             rangeWindowStart,
@@ -71,18 +77,14 @@ export async function GET(req: NextRequest) {
         const assessmentResults = [];
 
         for (const plan of plans) {
-            const [startH, startM] = plan.startTime.split(':').map(Number);
-            const [endH, endM] = plan.endTime.split(':').map(Number);
             const planCheckpointIds = plan.route.checkpoints.map(cp => cp.checkpointId);
 
             for (const day of days) {
-                const planStart = new Date(day);
-                planStart.setHours(startH, startM, 0, 0);
-
-                let planEnd = new Date(day);
-                planEnd.setHours(endH, endM, 0, 0);
-                if (planEnd < planStart) {
-                    planEnd = addDays(planEnd, 1);
+                const dayStr = day.toISOString().split('T')[0];
+                const planStart = new Date(`${dayStr}T${plan.startTime}:00+08:00`);
+                let planEnd = new Date(`${dayStr}T${plan.endTime}:00+08:00`);
+                if (planEnd <= planStart) {
+                    planEnd = new Date(planEnd.getTime() + 24 * 60 * 60 * 1000);
                 }
 
                 const checkpointCount = planCheckpointIds.length;
@@ -127,10 +129,10 @@ export async function GET(req: NextRequest) {
                 }
 
                 assessmentResults.push({
-                    id: `${plan.id}_${format(day, 'yyyy-MM-dd')}`,
+                    id: `${plan.id}_${dayStr}`,
                     planId: plan.id,
                     planName: plan.name,
-                    date: format(day, 'yyyy-MM-dd'),
+                    date: dayStr,
                     routeId: plan.route.id,
                     routeName: plan.route.name,
                     groupName: plan.group.name,

@@ -18,13 +18,21 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
         }
         const { searchParams } = new URL(req.url);
-        const startDateStr = searchParams.get('startDate') || format(new Date(), 'yyyy-MM-dd');
+        const getBeijingTodayStr = () => {
+            const now = new Date();
+            const utc = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+            const beijingTime = new Date(utc + 8 * 60 * 60 * 1000);
+            return format(beijingTime, 'yyyy-MM-dd');
+        };
+        const startDateStr = searchParams.get('startDate') || getBeijingTodayStr();
         const endDateStr = searchParams.get('endDate') || startDateStr;
         const groupId = searchParams.get('groupId') || '';
         const roleCode = searchParams.get('roleCode') || '';
 
-        const startDate = parse(startDateStr, 'yyyy-MM-dd', new Date());
-        const endDate = parse(endDateStr, 'yyyy-MM-dd', new Date());
+        const [sYear, sMonth, sDay] = startDateStr.split('-').map(Number);
+        const [eYear, eMonth, eDay] = endDateStr.split('-').map(Number);
+        const startDate = new Date(Date.UTC(sYear, sMonth - 1, sDay));
+        const endDate = new Date(Date.UTC(eYear, eMonth - 1, eDay));
 
         if (differenceInCalendarDays(endDate, startDate) > 31 || endDate < startDate) {
             return NextResponse.json({ error: '日期范围不合法，最长支持31天' }, { status: 400 });
@@ -58,10 +66,8 @@ export async function GET(req: NextRequest) {
         }
 
         // 批量拉取范围内所有打卡记录
-        const rangeStart = new Date(startDate);
-        rangeStart.setHours(0, 0, 0, 0);
-        const rangeEnd = new Date(endDate);
-        rangeEnd.setHours(23, 59, 59, 999);
+        const rangeStart = new Date(`${startDateStr}T00:00:00+08:00`);
+        const rangeEnd = new Date(`${endDateStr}T23:59:59.999+08:00`);
 
         const allCheckpointIds = [...new Set(plans.flatMap(p => p.route.checkpoints.map(cp => cp.checkpointId)))];
         const allRecords = await fetchPatrolRecordsByDateRange(
@@ -91,7 +97,12 @@ export async function GET(req: NextRequest) {
         const planTypes = [...new Set(plans.map(p => p.planType === 'ORDERED' ? '有序计划' : '无序计划'))].join('+');
         csvRows.push(`\uFEFF${escapeCSV(planTypes + '考核报告')}`);
         csvRows.push('');
-        csvRows.push(`,,,,,,${escapeCSV('导出时间：' + format(new Date(), 'yyyy-MM-dd HH:mm:ss'))}`);
+        const getBeijingDateTimeStr = (date: Date = new Date()) => {
+            const utc = date.getTime() + date.getTimezoneOffset() * 60 * 1000;
+            const beijingTime = new Date(utc + 8 * 60 * 60 * 1000);
+            return format(beijingTime, 'yyyy-MM-dd HH:mm:ss');
+        };
+        csvRows.push(`,,,,,,${escapeCSV('导出时间：' + getBeijingDateTimeStr(new Date()))}`);
         csvRows.push('');
 
         // 表头
@@ -100,19 +111,16 @@ export async function GET(req: NextRequest) {
 
         // 数据行：按天 × 计划 × 巡检点
         for (const day of days) {
+            const dayStr = day.toISOString().split('T')[0];
             for (const plan of plans) {
-                const [startH, startM] = plan.startTime.split(':').map(Number);
-                const [endH, endM] = plan.endTime.split(':').map(Number);
+                const planStart = new Date(`${dayStr}T${plan.startTime}:00+08:00`);
+                let planEnd = new Date(`${dayStr}T${plan.endTime}:00+08:00`);
+                if (planEnd <= planStart) {
+                    planEnd = new Date(planEnd.getTime() + 24 * 60 * 60 * 1000);
+                }
 
-                const planStart = new Date(day);
-                planStart.setHours(startH, startM, 0, 0);
-
-                let planEnd = new Date(day);
-                planEnd.setHours(endH, endM, 0, 0);
-                if (planEnd <= planStart) planEnd = addDays(planEnd, 1);
-
-                const planStartStr = format(planStart, 'yyyy-MM-dd HH:mm:ss');
-                const planEndStr = format(planEnd, 'yyyy-MM-dd HH:mm:ss');
+                const planStartStr = getBeijingDateTimeStr(planStart);
+                const planEndStr = getBeijingDateTimeStr(planEnd);
 
                 const planCheckpointIds = plan.route.checkpoints.map(cp => cp.checkpointId);
 
@@ -121,7 +129,7 @@ export async function GET(req: NextRequest) {
                     const cpRecords = recordsByCheckpoint[rcp.checkpointId] || [];
                     const record = cpRecords.find(r => r.createdAt >= planStart && r.createdAt <= planEnd);
 
-                    const visitedAtStr = record ? format(record.createdAt, 'yyyy-MM-dd HH:mm:ss') : '';
+                    const visitedAtStr = record ? getBeijingDateTimeStr(record.createdAt) : '';
                     const patrollerName = record?.user?.name ?? '';
 
                     let result = '未到';
