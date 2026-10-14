@@ -22,7 +22,7 @@ on:
       - main
       - master
     paths:
-      - 'firmware/wand_firmware/config.h'
+      - 'firmware/wand_firmware_demo/config.h'
   workflow_dispatch: # 允许在 GitHub 界面手动触发工作流
 
 jobs:
@@ -44,7 +44,7 @@ jobs:
       # Arduino CLI 编译 FQBN (CDCOnBoot=default 用以兼容 ESP32-C3 简约版脱机假死缺陷)
       FQBN: "esp32:esp32:esp32c3:CDCOnBoot=default,FlashMode=dio,FlashSize=4M,PartitionScheme=min_spiffs"
       # Arduino .ino 主工程入口文件路径 (相对于仓库根目录)
-      SKETCH_PATH: "firmware/wand_firmware/wand_firmware.ino"
+      SKETCH_PATH: "firmware/wand_firmware_demo/wand_firmware_demo.ino"
       # esptool merge_bin 合包参数
       FLASH_CHIP: "esp32c3"
       FLASH_MODE: "dio"
@@ -60,7 +60,7 @@ jobs:
       - name: Extract firmware version
         id: get_version
         run: |
-          VERSION=$(grep -E '#define[[:space:]]+FIRMWARE_VERSION' firmware/wand_firmware/config.h | awk -F'"' '{print $2}')
+          VERSION=$(grep -E '#define[[:space:]]+FIRMWARE_VERSION' firmware/wand_firmware_demo/config.h | awk -F'"' '{print $2}')
           # 规范化版本号格式 (若无 'v' 前缀则自动补上)
           if [[ ! "$VERSION" =~ ^v ]]; then
             VERSION="v$VERSION"
@@ -127,7 +127,7 @@ jobs:
             --flash_freq "${FLASH_FREQ}" \
             0x0     ./build/*.bootloader.bin \
             0x8000  ./build/*.partitions.bin \
-            0x10000 ./build/wand_firmware.ino.bin
+            0x10000 ./build/wand_firmware_demo.ino.bin
 
           # 3. 生成 Full Firmware manifest.json (AnyFlash 烧录网页读取版本校验信息)
           FULL_MD5=$(md5sum "${FULL_DIR}/${FULL_BIN_NAME}" | cut -d ' ' -f 1)
@@ -146,7 +146,7 @@ jobs:
 
           # 4. 复制 OTA 固件包 (AnyFlash 云端升级分发)
           OTA_BIN_NAME="${PROJECT_ID}_OTA_${VERSION}.bin"
-          cp ./build/wand_firmware.ino.bin "${OTA_DIR}/${OTA_BIN_NAME}"
+          cp ./build/wand_firmware_demo.ino.bin "${OTA_DIR}/${OTA_BIN_NAME}"
 
           # 5. 提取 CHANGELOG 并生成 OTA manifest.json (Worker /api/ota/check 读取)
           RELEASE_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

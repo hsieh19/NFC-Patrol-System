@@ -23,7 +23,7 @@
 // ==========================================
 // AnyFlash OTA 升级配置
 // ==========================================
-#define FIRMWARE_VERSION       "v1.0.0"
+#define FIRMWARE_VERSION       "v1.0.1"
 #define ANYFLASH_PROJECT       "patrol_wand"
 #define ANYFLASH_CHIP          "ESP32C3"
 
