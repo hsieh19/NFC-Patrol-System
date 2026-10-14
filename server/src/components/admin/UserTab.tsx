@@ -321,6 +321,13 @@ export default function UserTab() {
         fetchGroups();
         fetchRoles();
         fetchWands();
+
+        // 巡更棒在线状态与唤醒响应 10 秒智能轮询
+        const timer = setInterval(() => {
+            fetchWands();
+        }, 10000);
+
+        return () => clearInterval(timer);
     }, []);
 
     if (loading || permissionLoading) return <div className="py-20 text-center">加载中...</div>;

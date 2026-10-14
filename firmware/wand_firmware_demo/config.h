@@ -31,9 +31,15 @@
 // 硬件引脚配置
 // ==========================================
 #define BUZZER_PIN     3   // 有源蜂鸣器驱动脚 (高电平有效)
+#define MOTOR_PIN      4   // 迷你振动马达驱动脚 (高电平触发，低电平截止)
 #define CONFIG_BTN     2   // 配网/重置物理按键 (低电平有效)
 
+// 双色共阴 LED 指示灯引脚配置 (高电平有效)
+#define LED_RED_PIN    6   // 红色 LED 控制引脚
+#define LED_GREEN_PIN  7   // 绿色 LED 控制引脚
+
 // MFRC522 (SPI) 引脚配置
+// 注意：GPIO6 与 GPIO7 已作为双色 LED 使用；若使用 IC 卡模式需避开或重新规划引脚
 #define RC522_SCK      4
 #define RC522_MISO     5
 #define RC522_MOSI     6
@@ -43,17 +49,12 @@
 // RDM6300 (UART1) 引脚配置
 #define RDM6300_RX     1   // RDM6300 TX -> ESP32-C3 RX1
 
-// RDM6300 电源控制引脚 (AO3400 N-ch MOSFET 低边开关控制)
-// HIGH = MOSFET 导通 = RDM6300 有 GND 回路 = 供电工作
-// LOW  = MOSFET 断开 = RDM6300 断电 = 零功耗待机
-#define RDM_PWR_PIN    10
-
 // ==========================================
 // 低功耗控制常量
 // ==========================================
 #define SLEEP_INTERVAL_SEC     900    // 日常心跳唤醒间隔 (秒，默认 15 分钟)
 #define WEB_CONFIG_TIMEOUT_MS  180000 // Web 配置活跃超时 (毫秒，3 分钟)
-#define WIFI_CONNECT_TIMEOUT_MS 12000 // WiFi 连接最大等待时间 (毫秒)
+#define WIFI_CONNECT_TIMEOUT_MS 20000 // WiFi 连接最大等待时间 (毫秒，20 秒)
 
 // ==========================================
 // 全局对象 extern 声明
@@ -91,6 +92,7 @@ extern unsigned long wifiConnectStartTime;
 extern bool isPatrolActive;          // 是否处于计划巡检工作状态
 extern unsigned long patrolStartMs;  // 巡检开启时间戳
 extern unsigned long patrolDurationMs; // 巡检持续时长(毫秒)
+extern int sleepIntervalSec;         // 用户配置的默认待机深度休眠心跳间隔（秒）
 extern int dynamicSleepIntervalSec;  // 后端下发的动态心跳间隔（秒）
 extern bool lowPowerEnabled;         // 是否启用省电功能
 

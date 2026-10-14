@@ -42,3 +42,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Web 配置页“升级”标签无反应问题**:
   - 修复由于 C++ 编译期将多行双引号字符串合并为单行，导致其中的 JS 单行注释 `//` 误将后续代码（包括 `switchTab` 等函数）全部注释的致命 Bug。
   - 将 Web 页面的 `htmlTemplate` 重构为 C++11 Raw String Literal (`R"=====( ... )====="`)，从根本上解决无换行合并问题，并提升了代码可读性与 ES5 兼容性。
+- **巡更期间计划时间调整后 LED 指示灯不熄灭问题**:
+  - 修复巡检期间 60 秒同步只上传离线记录而未发送心跳获取最新排班指令的问题，增加 `sendHeartbeat()` 心跳调用。
+  - 重构 `sendHeartbeat()` 中 `patrolDuration` 的解析逻辑：当处于巡检中时，动态同步更新剩余时长；当服务端指示计划已过期或取消（`patrolDuration <= 0`）时，及时重置 `isPatrolActive = false` 并立即熄灭 LED 重新进入 Deep Sleep。
+- **休眠心跳间隔 Web 可配置化与前后端自适应**:
+  - 移除非巡更待机期间硬编码的 15 分钟（900秒）休眠时长限制，在 Web 配置页新增“休眠心跳间隔 (秒)”配置输入项，持久化保存至 NVS `sleep_sec` 中。
+  - 服务端心跳接口动态接收巡更棒上报的 `sleepInterval`，并基于实际休眠周期自适应计算巡更任务的提前唤醒缓冲，避免写死 15 分钟与服务端 16 分钟阈值的逻辑冲突。
+- **WiFi 连网鲁棒性提升与后台 10 秒智能轮询**:
+  - 将固件默认 WiFi 握手超时由 12 秒延长至 20 秒 (`WIFI_CONNECT_TIMEOUT_MS = 20000`)，消除休眠唤醒后因路由器协商稍慢造成连网失败重新睡死的问题。
+  - 系统管理后台 `UserTab.tsx` 页面加入 10 秒定时自动轮询 `fetchWands()`，设备唤醒响应后页面实时刷新，无需手动按 F5。
+- **深度休眠唤醒可靠性加固与 60 秒故障重试机制**:
+  - 彻底修复 `enterDeepSleep()` 中破坏性调用 `WiFi.disconnect(true)` 导致醒来后射频硬件控制器 PHY 锁死的问题，改为 `WiFi.disconnect(false)` 并预留 100ms 硬件平滑关断延时。
+  - 在 `connectWifi()` 重新发起前执行状态重置，唤醒判断直接使用硬件权威状态 `cause == ESP_SLEEP_WAKEUP_TIMER`，消除 static RTC 变量判定隐患。
+  - 增加心跳失败智能容错：当唤醒后连网或心跳异常失败时，设备将转入 60 秒快速重试休眠（而非直接睡死 15 分钟），避免偶发断网导致长达数十分钟无法唤醒。

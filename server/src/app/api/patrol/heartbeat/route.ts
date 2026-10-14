@@ -6,11 +6,18 @@ import { db } from '@/lib/db';
  */
 export async function POST(req: NextRequest) {
   try {
-    const { wandUuid, ipAddress } = await req.json();
+    const { wandUuid, ipAddress, sleepInterval } = await req.json();
 
     if (!wandUuid) {
       return NextResponse.json({ error: 'Missing wandUuid' }, { status: 400 });
     }
+
+    // 客户端上报的休眠心跳间隔(秒)，合法范围 60~86400，缺省 900 秒 (15分钟)
+    const effectiveSleepIntervalSec = 
+      typeof sleepInterval === 'number' && sleepInterval >= 60 && sleepInterval <= 86400
+        ? sleepInterval
+        : 900;
+    const sleepIntervalMin = Math.ceil(effectiveSleepIntervalSec / 60);
 
     // 校验 UUID 授权
     const wand = await db.patrolWand.findUnique({
@@ -71,8 +78,8 @@ export async function POST(req: NextRequest) {
           // 距离巡检计划开始还有多少分钟
           const diffMin = (startMinute - currentMin + 1440) % 1440;
 
-          // 是否属于 16 分钟内即将开始的“前一次心跳”
-          const isAboutToStart = diffMin <= 16 && diffMin > 0;
+          // 是否属于一个休眠周期内即将开始的“前一次心跳” (预留 1 分钟缓冲)
+          const isAboutToStart = diffMin <= (sleepIntervalMin + 1) && diffMin > 0;
 
           // 是否正处于巡检时间段内
           let isInside = false;
@@ -139,7 +146,7 @@ export async function POST(req: NextRequest) {
       cardType: wand.cardType,
       shouldWakeServer: wand.shouldWakeServer,
       patrolDuration: patrolDurationSec,
-      sleepInterval: 900,
+      sleepInterval: effectiveSleepIntervalSec,
     });
   } catch (error: unknown) {
     console.error('Heartbeat API error:', error);

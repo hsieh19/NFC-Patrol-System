@@ -111,12 +111,18 @@ const char* htmlTemplate = R"=====(<!DOCTYPE html>
             <input type='number' name='interval' min='10' max='3600' required value='%INTERVAL%'>
           </div>
         </div>
-        <div class='field'>
-          <label>省电模式</label>
-          <select name='low_power'>
-            <option value='1' %SELECTED_LP_ON%>启用 (日常日常深睡眠，15分钟心跳)</option>
-            <option value='0' %SELECTED_LP_OFF%>禁用 (不休眠，全功能常驻/实时上传)</option>
-          </select>
+        <div class='field-row'>
+          <div class='field'>
+            <label>省电模式</label>
+            <select name='low_power'>
+              <option value='1' %SELECTED_LP_ON%>启用 (深睡眠待机模式)</option>
+              <option value='0' %SELECTED_LP_OFF%>禁用 (常驻不休眠模式)</option>
+            </select>
+          </div>
+          <div class='field'>
+            <label>休眠心跳间隔 (秒)</label>
+            <input type='number' name='sleep_sec' min='60' max='86400' required value='%SLEEP_SEC%' placeholder='默认 900 秒 (15分钟)'>
+          </div>
         </div>
         <button type='submit'>保存并重启巡更棒</button>
       </form>
@@ -326,6 +332,7 @@ void handleRoot() {
     html.replace("%SELECTED_LP_ON%", lowPowerEnabled ? "selected" : "");
     html.replace("%SELECTED_LP_OFF%", !lowPowerEnabled ? "selected" : "");
     html.replace("%INTERVAL%", String(wifiInterval));
+    html.replace("%SLEEP_SEC%", String(sleepIntervalSec));
     html.replace("%LAST_CARD%", lastScannedCardToShow);
     
     server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -342,6 +349,7 @@ void handleSave() {
     String newAnyflash = server.arg("anyflash");
     String newMode = server.arg("mode");
     String newInterval = server.arg("interval");
+    String newSleepSec = server.arg("sleep_sec");
     String newLowPower = server.arg("low_power");
 
     preferences.putString("uuid", newUuid);
@@ -358,6 +366,11 @@ void handleSave() {
     if (intervalVal < 10) intervalVal = 10;
     if (intervalVal > 3600) intervalVal = 3600;
     preferences.putInt("interval", intervalVal);
+
+    int sleepSecVal = newSleepSec.toInt();
+    if (sleepSecVal < 60) sleepSecVal = 60;
+    if (sleepSecVal > 86400) sleepSecVal = 86400;
+    preferences.putInt("sleep_sec", sleepSecVal);
 
     // 构造带 UTF-8 编码和 6 秒自动跳转的等待网页
     String redirectHtml = 
@@ -423,6 +436,7 @@ void startCaptivePortal() {
     Serial.println("[AP配置模式] 热点开启: " + apName + ", 请访问 192.168.4.1 进行配置。");
 
     while (true) {
+        updateLedIndicator(); // AP 模式下同步维持指示灯更新 (如刷卡亮红灯 3 秒)
         dnsServer.processNextRequest();
         server.handleClient();
         handleCardReading(); // 核心：支持在 AP 模式下无阻塞读卡并写入 LittleFS 缓存

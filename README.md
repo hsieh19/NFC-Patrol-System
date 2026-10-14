@@ -42,7 +42,7 @@
 ```text
 NFC-Patrol-System/
 ├── firmware/                 # 智能巡更棒固件 (ESP32-C3)
-│   ├── wand_firmware/        # Arduino/C++ 固件源码
+│   ├── wand_firmware_demo/   # Arduino/C++ 固件源码 (Demo 演示版，无 MOSFET 电源引脚)
 │   └── CHANGELOG.md          # 固件更新日志
 └── server/                   # 全栈 Web 业务系统 (Next.js 16)
     ├── prisma/               # Prisma 数据库 Schema 与数据库接口
@@ -116,7 +116,7 @@ npm run start
 ```
 
 ### 4. 智能巡更棒固件编译与烧录指引
-固件源码位于根目录的 [firmware/wand_firmware/](file:///e:/AI%20Project/NFC-Patrol-System/firmware/wand_firmware) 文件夹中。
+固件源码位于根目录的 [firmware/wand_firmware_demo/](file:///e:/AI%20Project/NFC-Patrol-System/firmware/wand_firmware_demo) 文件夹中。
 - **环境搭建**：使用 **Arduino IDE**。请通过“库管理器”搜索并安装以下依赖库：
   - **`MFRC522`** (IC卡 13.56MHz 驱动库)
   - **`ArduinoJson`** (JSON 解析与序列化库，推荐 7.x 版本)

@@ -40,11 +40,13 @@ unsigned long wifiConnectStartTime = 0;
 bool isPatrolActive        = false;
 unsigned long patrolStartMs    = 0;
 unsigned long patrolDurationMs = 0;
+int sleepIntervalSec           = SLEEP_INTERVAL_SEC;
 int dynamicSleepIntervalSec    = SLEEP_INTERVAL_SEC;
 bool lowPowerEnabled           = true;
 
 // 包含具体模块的业务实现头文件
 #include "utils.h"
+#include "led_indicator.h"
 #include "storage.h"
 #include "low_power.h"   // ← 必须在 network.h 前引入（被其依赖）
 #include "network.h"
@@ -56,6 +58,8 @@ bool lowPowerEnabled           = true;
 // WiFi 快速连接辅助函数
 // ==========================================
 bool connectWifi(int timeoutMs = WIFI_CONNECT_TIMEOUT_MS) {
+    WiFi.disconnect(false);
+    delay(30);
     WiFi.mode(WIFI_STA);
     WiFi.begin(wifiSsid.c_str(), wifiPassword.c_str());
     Serial.print("[WiFi] 正在连接: " + wifiSsid + " ");
@@ -69,19 +73,21 @@ bool connectWifi(int timeoutMs = WIFI_CONNECT_TIMEOUT_MS) {
 }
 
 // ==========================================
-// 心跳+补传的连网同步（唤醒后快速执行）
+// 心跳+补传的连网同步（唤醒后快速执行，返回同步是否成功）
 // ==========================================
-void quickSync() {
+bool quickSync() {
     if (connectWifi()) {
         Serial.print("[WiFi] 连接成功，IP: ");
         Serial.println(WiFi.localIP());
-        sendHeartbeat();      // 同步时间 / 获取云端指令
-        syncOfflineRecords(); // 补传离线打卡缓存
+        bool hbOk = sendHeartbeat();      // 同步时间 / 获取云端指令
+        syncOfflineRecords();            // 补传离线打卡缓存
         Ota::confirm_running_partition();
+        return hbOk;
     } else {
         // 联网失败：尝试用 RTC 内存推算时间，保证打卡有时间戳
         Serial.println("[WiFi] 连接超时，使用 RTC 内存估算时间戳。");
         restoreTimeFromRTC();
+        return false;
     }
 }
 
@@ -99,17 +105,10 @@ void setup() {
     // 基础 GPIO 初始化
     pinMode(BUZZER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, LOW);  // 上电立即静音，防止 GPIO 保持高电平
+    pinMode(MOTOR_PIN, OUTPUT);
+    digitalWrite(MOTOR_PIN, LOW);   // 上电马达静止，防止误震动
     pinMode(CONFIG_BTN, INPUT_PULLUP);
-    
-    // 对 RDM 电源引脚启用内部下拉电阻并设为输出低电平，抑制上电浮空
-    gpio_pullup_dis((gpio_num_t)RDM_PWR_PIN);
-    gpio_pulldown_en((gpio_num_t)RDM_PWR_PIN);
-    pinMode(RDM_PWR_PIN, OUTPUT);
-    digitalWrite(RDM_PWR_PIN, LOW); // 默认关断 RDM6300 电源
-
-    // 释放 Deep Sleep 期间的 GPIO hold（如已启用）
-    gpio_hold_dis((gpio_num_t)RDM_PWR_PIN);
-    gpio_deep_sleep_hold_dis();
+    initLedIndicator();             // 初始化双色共阴 LED (GPIO6/GPIO7 初始输出低电平全灭)
 
     // 挂载 LittleFS 缓存文件系统
     if (!LittleFS.begin(true)) {
@@ -126,6 +125,8 @@ void setup() {
     cardType   = preferences.getString("mode", "IC");
     wandName   = preferences.getString("name", "未同步");
     wifiInterval = preferences.getInt("interval", 60);
+    sleepIntervalSec = preferences.getInt("sleep_sec", SLEEP_INTERVAL_SEC);
+    dynamicSleepIntervalSec = sleepIntervalSec;
     lowPowerEnabled = preferences.getBool("low_power", false); // 读取 NVS 省电开关，默认关闭 (false)
 
     Serial.println("======================================");
@@ -136,6 +137,8 @@ void setup() {
     Serial.println("OTA地址: " + anyflashServer);
     Serial.println("读卡模式: " + cardType);
     Serial.println("设备名称: " + wandName);
+    Serial.println("同步间隔: " + String(wifiInterval) + " 秒");
+    Serial.println("休眠间隔: " + String(sleepIntervalSec) + " 秒");
     Serial.println("省电模式: " + String(lowPowerEnabled ? "已启用" : "已禁用"));
     Serial.println("======================================");
 
@@ -152,8 +155,8 @@ void setup() {
             return;
         }
 
-        // 2. 正常连接 WiFi (不限连接超时，最多尝试 15 秒)
-        connectWifi(15000);
+        // 2. 正常连接 WiFi (使用配置超时时间，最多 20 秒)
+        connectWifi(WIFI_CONNECT_TIMEOUT_MS);
 
         if (WiFi.status() == WL_CONNECTED) {
             Serial.print("[WiFi] 连通！本地 IP: ");
@@ -183,8 +186,8 @@ void setup() {
     // ==========================================
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
 
-    if (cause == ESP_SLEEP_WAKEUP_TIMER && wasDeepSleep) {
-        // ---- 分支 A：15 分钟 RTC 定时心跳唤醒 ----
+    if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+        // ---- 分支 A：RTC 定时心跳唤醒 ----
         Serial.println("[唤醒] RTC 定时器心跳唤醒，执行快速同步...");
 
         // 若参数为空则无法联网，拉起 AP 配置热点
@@ -195,7 +198,7 @@ void setup() {
         }
 
         // 快速联网 + 心跳 + 补传离线数据
-        quickSync();
+        bool syncOk = quickSync();
 
         // 根据心跳响应结果决策下一步行为：
         if (isHttpServerRunning) {
@@ -206,20 +209,23 @@ void setup() {
         } else if (isPatrolActive) {
             // 云端下发了 patrolDuration，激活读卡硬件，进入巡检工作模式
             Serial.println("[巡检模式] 计划巡检已激活，正在启动读卡驱动...");
-            WiFi.disconnect(true);
-            WiFi.mode(WIFI_OFF); // 关闭 WiFi 节省电量，60 秒后再同步
+            WiFi.disconnect(false);
+            WiFi.mode(WIFI_OFF);
             if (cardType == "IC") {
                 initRC522();
             } else {
                 initRDM6300();
             }
-            lastWifiSyncTime = millis(); // 开始计时，60 秒后同步一次
+            lastWifiSyncTime = millis();
             // 进入 loop() 执行读卡巡检逻辑
-        } else {
-            // 无任何指令，同步完成立刻重新睡死（最短唤醒时间，最小功耗）
-            Serial.println("[心跳完毕] 无云端指令，立即重新进入 Deep Sleep...");
+        } else if (syncOk) {
+            // 同步成功且无任何待办指令，进入用户设定的正常休眠时长 (默认 900 秒)
+            Serial.printf("[心跳完毕] 状态同步成功，无云端指令，进入正常休眠 (%d 秒)...\n", dynamicSleepIntervalSec);
             enterDeepSleep(dynamicSleepIntervalSec);
-            // enterDeepSleep() 内部调用 esp_deep_sleep_start()，此处以后不执行
+        } else {
+            // 连网失败或心跳异常：设置 60 秒快速重试休眠，避免长时间失联
+            Serial.println("[同步重试] 连网或心跳异常，将在 60 秒后重新唤醒重试，避免长时间失联...");
+            enterDeepSleep(60);
         }
 
     } else {
@@ -236,7 +242,7 @@ void setup() {
 
         // 首次上电：连网 → 心跳 → 补传 → 进入 Deep Sleep 正常循环
         // Web 配置服务只在心跳响应中收到 shouldWakeServer=true 时才激活
-        quickSync();
+        bool syncOk = quickSync();
 
         if (isHttpServerRunning) {
             // 云端指示激活配置页
@@ -244,7 +250,7 @@ void setup() {
             lastHttpActivityTime = millis();
         } else if (isPatrolActive) {
             // 首次上电即有巡检计划（极少发生），激活读卡驱动
-            WiFi.disconnect(true);
+            WiFi.disconnect(false);
             WiFi.mode(WIFI_OFF);
             if (cardType == "IC") {
                 initRC522();
@@ -252,10 +258,14 @@ void setup() {
                 initRDM6300();
             }
             lastWifiSyncTime = millis();
-        } else {
-            // 常规冷启动：同步完毕后直接进入正常的 15 分钟睡眠循环
-            Serial.println("[冷启动完成] 同步完毕，进入 Deep Sleep 节能模式。");
+        } else if (syncOk) {
+            // 常规冷启动：同步完毕后进入正常睡眠循环
+            Serial.printf("[冷启动完成] 同步完毕，进入 %d 秒 Deep Sleep 节能模式。\n", dynamicSleepIntervalSec);
             enterDeepSleep(dynamicSleepIntervalSec);
+        } else {
+            // 冷启动同步失败：60 秒后重试
+            Serial.println("[冷启动异常] 首次连网或心跳异常，将在 60 秒后重新唤醒重试...");
+            enterDeepSleep(60);
         }
     }
 }
@@ -264,6 +274,9 @@ void setup() {
 // 主运行死循环（仅在非立即睡死的场景中执行）
 // ==========================================
 void loop() {
+    // 高频非阻塞更新双色指示灯状态 (读卡红灯3秒计时 / 计划巡检绿灯状态)
+    updateLedIndicator();
+
     // ---- 场景 A：省电未启用 (lowPowerEnabled == false) ----
     if (!lowPowerEnabled) {
         // 1. 始终以无阻塞高频执行读卡逻辑
@@ -316,21 +329,30 @@ void loop() {
         // 1. 持续高频读卡
         handleCardReading();
 
-        // 2. 每 60 秒开启 WiFi 同步一次离线打卡数据
-        if (millis() - lastWifiSyncTime >= 60000UL) {
-            Serial.println("[巡检同步] 60 秒周期，开启 WiFi 上传打卡数据...");
-            if (connectWifi(8000)) {
-                syncOfflineRecords();
+        // 2. 定时开启 WiFi 同步离线打卡数据与心跳 (间隔由用户配置的 wifiInterval 决定)
+        unsigned long syncIntervalMs = (unsigned long)(wifiInterval > 0 ? wifiInterval : 60) * 1000UL;
+        if (millis() - lastWifiSyncTime >= syncIntervalMs) {
+            Serial.printf("[巡检同步] %d 秒周期，开启 WiFi 上传打卡数据与心跳...\n", wifiInterval > 0 ? wifiInterval : 60);
+            if (connectWifi(WIFI_CONNECT_TIMEOUT_MS)) {
+                sendHeartbeat();      // 同步对时并获取最新巡检计划和远程指令
+                syncOfflineRecords(); // 上传离线打卡数据
             }
             WiFi.disconnect(true);
             WiFi.mode(WIFI_OFF);
             lastWifiSyncTime = millis();
+
+            // 若在心跳中发现计划已被后台调整结束或取消，立即休眠
+            if (!isPatrolActive) {
+                Serial.println("[巡检结束] 计划已被后台调整结束或提前取消，进入 Deep Sleep...");
+                enterDeepSleep(dynamicSleepIntervalSec);
+                return;
+            }
         }
 
         // 3. 检查巡检计划是否到期
         if (millis() - patrolStartMs >= patrolDurationMs) {
             Serial.println("[巡检结束] 计划时间已到，正在同步最终数据并进入 Deep Sleep...");
-            if (connectWifi(8000)) {
+            if (connectWifi(WIFI_CONNECT_TIMEOUT_MS)) {
                 syncOfflineRecords();
             }
             isPatrolActive = false;

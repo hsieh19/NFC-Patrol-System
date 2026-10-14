@@ -2,6 +2,7 @@
 #define LOW_POWER_H
 
 #include "config.h"
+#include "led_indicator.h"
 
 // ==========================================
 // RTC 慢速内存持久化变量 (Deep Sleep 期间保留)
@@ -10,32 +11,6 @@ RTC_DATA_ATTR static int64_t  rtcBaseTimeSec  = 0;  // 上次对时 Unix 时间�
 RTC_DATA_ATTR static int64_t  rtcBaseTimerUs  = 0;  // 上次对时时 esp_timer 计数(微秒)
 RTC_DATA_ATTR static int      offlineCacheCount = 0; // 离线未上传记录计数(唤醒快速判断)
 RTC_DATA_ATTR static bool     wasDeepSleep    = false; // 是否由 Deep Sleep 唤醒
-
-// ==========================================
-// RDM6300 电源控制 (通过 AO3400 MOSFET)
-// ==========================================
-
-/**
- * @brief 开启 RDM6300 电源 (拉高 GPIO10，MOSFET 导通，接通 GND 回路)
- * 唤醒后需要等待约 50ms 供 125KHz 振荡器稳定
- */
-void rdmPowerOn() {
-    digitalWrite(RDM_PWR_PIN, HIGH);
-    delay(50); // 等待 RDM6300 振荡器稳定
-    Serial.println("[RDM6300] 电源已开启 (MOSFET ON)");
-}
-
-/**
- * @brief 关断 RDM6300 电源 (拉低 GPIO10，MOSFET 截止，断开 GND 回路)
- * 彻底断电，电流降至近似 0
- */
-void rdmPowerOff() {
-    if (rdmSerial) {
-        rdmSerial.end(); // 先关闭 UART1，释放引脚
-    }
-    digitalWrite(RDM_PWR_PIN, LOW);
-    Serial.println("[RDM6300] 电源已关断 (MOSFET OFF)");
-}
 
 // ==========================================
 // 读卡器深度关断 (RC522 Hard Power-Down)
@@ -107,7 +82,7 @@ void restoreTimeFromRTC() {
  * 执行顺序：
  * 1. 蜂鸣器静音 (防止 GPIO 保持 HIGH 导致休眠期间持续鸣叫)
  * 2. RC522 Hard Power-Down
- * 3. RDM6300 断电 (MOSFET 截止)
+ * 3. 释放 RDM6300 串口
  * 4. 关闭 WiFi 射频
  * 5. 设定 RTC 定时器唤醒 (使用动态间隔 dynamicSleepIntervalSec)
  * 6. 标记 wasDeepSleep = true，下次唤醒可判断来源
@@ -117,41 +92,36 @@ void restoreTimeFromRTC() {
  */
 void enterDeepSleep(int sleepSec = 0) {
     int actualSleepSec = (sleepSec > 0) ? sleepSec : dynamicSleepIntervalSec;
-    if (actualSleepSec <= 0) actualSleepSec = SLEEP_INTERVAL_SEC;
+    if (actualSleepSec <= 0) actualSleepSec = (sleepIntervalSec > 0 ? sleepIntervalSec : SLEEP_INTERVAL_SEC);
 
     Serial.printf("\n[Deep Sleep] 准备进入深度休眠，将在 %d 秒后唤醒...\n", actualSleepSec);
 
-    // Step 1: 蜂鸣器必须静音 (防止高电平保持导致休眠期间持续耗电)
+    // Step 1: 蜂鸣器、马达与指示灯必须关闭 (防止高电平保持导致休眠期间发声、震动或亮灯耗电)
     digitalWrite(BUZZER_PIN, LOW);
+    digitalWrite(MOTOR_PIN, LOW);
+    turnOffAllLeds();
 
     // Step 2: RC522 Hard Power-Down (仅在 IC 卡模式下)
     if (cardType == "IC") {
         rc522PowerDown();
     }
 
-    // Step 3: RDM6300 断电 (仅在 ID 卡模式下，通过 AO3400 MOSFET 截止)
-    if (cardType == "ID") {
-        rdmPowerOff();
+    // Step 3: 关闭串口释放引脚 (仅在 ID 卡模式下)
+    if (cardType == "ID" && rdmSerial) {
+        rdmSerial.end();
     }
 
-    // Step 4: 关闭 WiFi 射频
+    // Step 4: 关闭 WiFi 射频并平滑下电
     if (isHttpServerRunning) {
         server.close();
         isHttpServerRunning = false;
     }
-    WiFi.disconnect(true);
+    WiFi.disconnect(false); // 保持配置有效，不进行破坏性擦除
     WiFi.mode(WIFI_OFF);
-    Serial.println("[Deep Sleep] WiFi 射频已关闭");
+    delay(100);             // 留足 100ms 供 ESP32 底层射频状态机彻底完成注销，防止唤醒 PHY 锁死
+    Serial.println("[Deep Sleep] WiFi 射频已平滑关闭");
 
-    // Step 5: 开启内部下拉，确保 RDM_PWR_PIN 低电平在休眠中由内部硬件拉低锁死，省掉外部下拉电阻
-    if (cardType == "ID") {
-        gpio_pullup_dis((gpio_num_t)RDM_PWR_PIN);  // 禁用上拉
-        gpio_pulldown_en((gpio_num_t)RDM_PWR_PIN); // 启用下拉 (约 45kΩ)
-        gpio_hold_en((gpio_num_t)RDM_PWR_PIN);     // 锁定 GPIO 状态
-    }
-    gpio_deep_sleep_hold_en(); // 启用 Deep Sleep 期间 GPIO hold 功能
-
-    // Step 6: 标记深睡标志
+    // Step 5: 标记深睡标志
     wasDeepSleep = true;
 
     // Step 7: 配置定时唤醒

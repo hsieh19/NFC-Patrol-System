@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include "utils.h"
+#include "led_indicator.h"
 #include "storage.h"
 #include "network.h"
 
@@ -20,8 +21,6 @@ void initRC522() {
 }
 
 void initRDM6300() {
-    // 通过 AO3400 MOSFET 上电 RDM6300
-    rdmPowerOn(); // 拉高 GPIO10，MOSFET 导通，RDM6300 接通 GND 回路
     rdmSerial.begin(9600, SERIAL_8N1, RDM6300_RX, -1);
     Serial.println("[初始化成功] RDM6300 (ID卡 125KHz) 串口监听已就绪。");
 }
@@ -76,7 +75,8 @@ void handleCardReading() {
 
         lastScanTime = now;
         lastScannedCard = cardId;
-        beep(100); // 蜂鸣器滴声
+        alertSuccess(); // 声光触觉双重反馈 (蜂鸣短鸣 + 马达震动)
+        triggerCardSuccessLed(); // 读卡成功：亮 3 秒红灯 (非阻塞)
 
         unsigned long long ts = getAbsoluteTimestamp();
         Serial.printf("[刷卡感应] 卡号: %s, 时间: %llu\n", cardId.c_str(), ts);

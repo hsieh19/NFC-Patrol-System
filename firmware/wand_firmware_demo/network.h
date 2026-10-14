@@ -52,20 +52,22 @@ bool uploadSingleRecord(String cardId, unsigned long long ts) {
 // ==========================================
 // 硬件接口通讯：心跳发送与对时
 // ==========================================
-void sendHeartbeat() {
-    if (WiFi.status() != WL_CONNECTED) return;
+bool sendHeartbeat() {
+    if (WiFi.status() != WL_CONNECTED) return false;
 
     HTTPClient http;
     String url = serverUrl + "/api/patrol/heartbeat";
     http.begin(url);
     http.addHeader("Content-Type", "application/json");
 
-    String payload = "{\"wandUuid\":\"" + wandUuid + "\",\"ipAddress\":\"" + WiFi.localIP().toString() + "\"}";
+    String payload = "{\"wandUuid\":\"" + wandUuid + "\",\"ipAddress\":\"" + WiFi.localIP().toString() + "\",\"sleepInterval\":" + String(sleepIntervalSec) + "}";
     
     Serial.println("[心跳上报] 载荷: " + payload);
     int code = http.POST(payload);
+    bool isSuccess = false;
     
     if (code == 200) {
+        isSuccess = true;
         String response = http.getString();
         Serial.println("[心跳响应] " + response);
 
@@ -144,14 +146,25 @@ void sendHeartbeat() {
             if (endIdx != -1) durStr = durStr.substring(0, endIdx);
             durStr.trim();
             int durationSec = durStr.toInt();
-            if (durationSec > 0 && !isPatrolActive) {
-                Serial.printf("[巡检计划] 收到巡检指令，巡检时长: %d 秒\n", durationSec);
-                isPatrolActive = true;
+            if (durationSec > 0) {
+                if (!isPatrolActive) {
+                    Serial.printf("[巡检计划] 收到巡检指令，巡检时长: %d 秒\n", durationSec);
+                    isPatrolActive = true;
+                    // 首次开启巡检：蜂鸣器与马达提醒巡检开始
+                    beep(200); delay(100); beep(200); delay(100);
+                    vibrate(400); // 震动提醒
+                    Serial.println("[巡检开始] 蜂鸣与振动已提醒，进入巡检工作状态。");
+                } else {
+                    Serial.printf("[巡检计划] 同步最新巡检剩余时长: %d 秒\n", durationSec);
+                }
                 patrolStartMs  = millis();
                 patrolDurationMs = (unsigned long)durationSec * 1000UL;
-                // 蜂鸣器急促响 3 声，提醒用户巡检开始
-                beep(200); delay(100); beep(200); delay(100); beep(400);
-                Serial.println("[巡检开始] 蜂鸣器已提醒，进入巡检工作状态。");
+            } else {
+                if (isPatrolActive) {
+                    Serial.println("[巡检计划] 服务端指示当前无有效巡检计划（已结束或提前取消）。");
+                    isPatrolActive = false;
+                    patrolDurationMs = 0;
+                }
             }
         }
     } else {
@@ -161,6 +174,7 @@ void sendHeartbeat() {
         }
     }
     http.end();
+    return isSuccess;
 }
 
 // ==========================================

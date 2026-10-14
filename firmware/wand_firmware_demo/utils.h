@@ -13,6 +13,27 @@ void beep(int ms) {
 }
 
 // ==========================================
+// 振动马达驱动 (高电平导通起振)
+// ==========================================
+void vibrate(int ms) {
+    digitalWrite(MOTOR_PIN, HIGH);
+    delay(ms);
+    digitalWrite(MOTOR_PIN, LOW);
+}
+
+// ==========================================
+// 刷卡成功提示反馈 (蜂鸣 + 马达震动双重触觉听觉反馈)
+// ==========================================
+void alertSuccess() {
+    digitalWrite(BUZZER_PIN, HIGH);
+    digitalWrite(MOTOR_PIN, HIGH);
+    delay(80); // 蜂鸣声持续 80ms
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(70); // 马达继续震动 70ms，总震感 150ms
+    digitalWrite(MOTOR_PIN, LOW);
+}
+
+// ==========================================
 // 校准 ESP32-C3 内部 RTC 系统时间
 // ==========================================
 void syncLocalTime(unsigned long long epochMs) {
